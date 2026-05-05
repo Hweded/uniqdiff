@@ -1,5 +1,26 @@
 # Benchmarks
 
+This directory contains two benchmark groups:
+
+- `benchmarks/run.py`: focused `uniqdiff` backend benchmarks.
+- `benchmarks/comparison/`: neutral cross-tool comparison against pandas, DuckDB,
+  csv-diff/csvdiff-style workflows, and DataComPy.
+
+Cross-tool benchmark dependencies are optional and must not be added to core
+runtime dependencies:
+
+```bash
+pip install -e ".[benchmark]"
+python benchmarks/comparison/run.py --rows 10000
+```
+
+The cross-tool suite is intentionally fit-by-use-case oriented. It reports
+support levels, setup complexity, elapsed time, peak Python memory, output size,
+and a workload-dependent disclaimer instead of claiming that one tool is
+universally faster.
+
+## uniqdiff backend benchmarks
+
 Run local benchmarks with:
 
 ```bash

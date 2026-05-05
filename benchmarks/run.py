@@ -25,7 +25,14 @@ from uniqdiff import compare  # noqa: E402
 
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Run uniqdiff benchmark scenarios.")
-    parser.add_argument("--size", type=int, default=100_000, help="Number of values per input.")
+    parser.add_argument(
+        "--size",
+        "--rows",
+        dest="size",
+        type=int,
+        default=100_000,
+        help="Number of values per input.",
+    )
     parser.add_argument(
         "--overlap",
         type=float,

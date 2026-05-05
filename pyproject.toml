@@ -40,6 +40,12 @@ dev = [
 ]
 fuzzy = ["rapidfuzz>=3.0"]
 parquet = ["pyarrow>=15.0"]
+benchmark = [
+  "csv-diff>=1.2",
+  "datacompy>=0.13",
+  "duckdb>=0.10",
+  "pandas>=2.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/Hweded/uniqdiff"

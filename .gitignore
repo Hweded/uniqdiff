@@ -5,6 +5,7 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.hypothesis/
 .venv/
 build/
 dist/
@@ -19,8 +20,19 @@ pytest-cache-files-*/
 *.csv.tmp
 tmp/
 benchmarks/.tmp/
+benchmarks/results/
 benchmarks_tmp/
 tests/fixtures/*-output.*
 uniqdiff-*.part
 uniqdiff-*.sort
 uniqdiff-*.sqlite3
+
+# Local packaging/install scratch space.
+.pip-tmp/
+
+# Local repository comparison clones and accidental nested copies.
+uniq_remote_check/
+uniqdiff/
+
+# Generated documentation archives.
+docs/*.zip
