@@ -8,6 +8,7 @@ This directory contains project documentation for users and maintainers.
 - [Recipes](recipes.md)
 - [Stable Engine Contract](stable-engine-contract.md)
 - [Engine Boundary](engine-boundary.md)
+- [UniqTools Concept](uniqtools-concept.md)
 - [Public API Boundary](public-api.md)
 - [API Reference](api-reference.md)
 - [Connectors](connectors.md)
