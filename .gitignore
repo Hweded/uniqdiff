@@ -32,7 +32,7 @@ uniqdiff-*.sqlite3
 
 # Local repository comparison clones and accidental nested copies.
 uniq_remote_check/
-uniqdiff/
+/uniqdiff/
 
 # Generated documentation archives.
 docs/*.zip
