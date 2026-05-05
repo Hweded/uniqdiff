@@ -125,6 +125,10 @@ documented as advanced modes because they expose additional operational trade-of
 around temporary files, partition counts, sorting passes, and backend-selection
 metadata.
 
+Auto-mode decisions are produced by the internal planner layer and exposed through
+`metadata["auto_decision"]`. The metadata is stable enough for diagnostics, but
+callers should treat unknown future fields as informational.
+
 Backend semantics should agree on exact comparison meaning. Ordering may differ
 between disk strategies and should not be treated as a cross-backend guarantee.
 

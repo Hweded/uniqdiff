@@ -4,29 +4,22 @@ from __future__ import annotations
 
 import hashlib
 from collections import defaultdict
-from collections.abc import Callable, Iterable, Sequence, Sized
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
 from uniqdiff._typing import KeySpec, Normalizer
-from uniqdiff._utils import canonicalize, ensure_mode, parse_size
+from uniqdiff._utils import canonicalize
 from uniqdiff.connectors import connect
 from uniqdiff.disk import atomic_write_result
-from uniqdiff.exceptions import InvalidInputError
-from uniqdiff.output import ensure_result_mode
+from uniqdiff.planner import build_duplicates_plan, build_execution_plan, disk_compare_backend
 from uniqdiff.result import CompareResult, CompareStats
 from uniqdiff.storage import (
-    compare_external_sort,
-    compare_partitions,
-    compare_sqlite,
     duplicates_external_sort,
     duplicates_partitions,
     duplicates_sqlite,
 )
 from uniqdiff.tokens import TokenFactory, make_token_factory
-
-_AUTO_BYTES_PER_ITEM = 512
-_AUTO_MEMORY_SAFETY_FACTOR = 0.70
 
 
 def compare(
@@ -57,44 +50,27 @@ def compare(
     public contract for future out-of-core strategies.
     """
 
-    selected_mode = ensure_mode(mode)
-    selected_result_mode = ensure_result_mode(result_mode)
-    selected_disk_strategy = _ensure_disk_strategy(disk_strategy)
-    selected_partition_count = partition_count or 16
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be greater than zero")
-    if selected_result_mode == "file" and output is None:
-        raise InvalidInputError("result_mode='file' requires output")
-    if selected_result_mode == "file" and selected_mode == "memory":
-        raise InvalidInputError("result_mode='file' requires mode='disk' or mode='auto'")
-
-    metadata = {
-        "backend": "memory",
-        "chunk_size": chunk_size,
-        "memory_limit": memory_limit,
-        "temp_dir": temp_dir,
-        "disk_limit": disk_limit,
-        "disk_strategy": selected_disk_strategy,
-        "partition_count": selected_partition_count,
-        "result_mode": selected_result_mode,
-        "preserve_order": preserve_order,
-    }
-    auto_decision = _auto_decision(
+    plan = build_execution_plan(
         first,
         second,
+        mode=mode,
+        result_mode=result_mode,
+        disk_strategy=disk_strategy,
+        partition_count=partition_count,
         memory_limit=memory_limit,
         temp_dir=temp_dir,
-        result_mode=selected_result_mode,
+        disk_limit=disk_limit,
+        chunk_size=chunk_size,
+        output=output,
+        preserve_order=preserve_order,
     )
-    use_disk = selected_mode == "disk" or (selected_mode == "auto" and auto_decision["use_disk"])
-    metadata["auto_decision"] = auto_decision if selected_mode == "auto" else None
     token_factory = make_token_factory(key=key, normalizer=normalizer)
 
-    if use_disk:
-        disk_compare = _disk_compare_backend(selected_disk_strategy)
+    if plan.use_disk:
+        disk_compare = disk_compare_backend(plan.disk_strategy)
         extra_kwargs: dict[str, Any] = {}
-        if selected_disk_strategy == "hash_partition":
-            extra_kwargs["partition_count"] = selected_partition_count
+        if plan.disk_strategy == "hash_partition":
+            extra_kwargs["partition_count"] = plan.partition_count
         result = disk_compare(
             first,
             second,
@@ -104,16 +80,16 @@ def compare(
             chunk_size=chunk_size,
             temp_dir=temp_dir,
             disk_limit=disk_limit,
-            mode=selected_mode,
+            mode=plan.mode,
             strategy=strategy,
-            metadata=metadata,
-            output=output if selected_result_mode == "file" else None,
-            result_mode=selected_result_mode,
+            metadata=plan.metadata,
+            output=output if plan.result_mode == "file" else None,
+            result_mode=plan.result_mode,
             **extra_kwargs,
         )
         if not include_stats:
             result.stats = CompareStats()
-        if output is not None and selected_result_mode == "memory":
+        if output is not None and plan.result_mode == "memory":
             written = atomic_write_result(result, output)
             result.metadata["output"] = str(written)
         return result
@@ -166,7 +142,7 @@ def compare(
         common_count=len(common_keys),
         duplicate_first_count=0 if duplicates_first is None else len(duplicates_first),
         duplicate_second_count=0 if duplicates_second is None else len(duplicates_second),
-        mode=selected_mode,
+        mode=plan.mode,
         strategy=strategy,
     )
 
@@ -178,7 +154,7 @@ def compare(
         duplicates_first=duplicates_first,
         duplicates_second=duplicates_second,
         stats=stats if include_stats else CompareStats(),
-        metadata=metadata,
+        metadata=plan.metadata,
         warnings=[],
     )
 
@@ -223,30 +199,26 @@ def duplicates(
 ) -> list[Any]:
     """Return duplicate items from one iterable."""
 
-    selected_mode = ensure_mode(mode)
-    selected_disk_strategy = _ensure_disk_strategy(disk_strategy)
-    selected_partition_count = partition_count or 16
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be greater than zero")
-    auto_decision = _auto_decision(
+    plan = build_duplicates_plan(
         data,
-        (),
-        memory_limit=None,
+        mode=mode,
+        disk_strategy=disk_strategy,
+        partition_count=partition_count,
+        chunk_size=chunk_size,
         temp_dir=temp_dir,
-        result_mode="memory",
     )
-    if selected_mode == "disk" or (selected_mode == "auto" and auto_decision["use_disk"]):
+    if plan.use_disk:
         token_factory = make_token_factory(key=key, normalizer=normalizer)
-        if selected_disk_strategy == "hash_partition":
+        if plan.disk_strategy == "hash_partition":
             return duplicates_partitions(
                 data,
                 token_factory=token_factory,
                 chunk_size=chunk_size,
                 temp_dir=temp_dir,
                 disk_limit=disk_limit,
-                partition_count=selected_partition_count,
+                partition_count=plan.partition_count,
             )
-        if selected_disk_strategy == "external_sort":
+        if plan.disk_strategy == "external_sort":
             return duplicates_external_sort(
                 data,
                 token_factory=token_factory,
@@ -431,105 +403,3 @@ def _index_items(
 
 def _first_values(first_by_token: dict[Any, Any], keys: Iterable[Any]) -> list[Any]:
     return [first_by_token[key] for key in keys]
-
-
-def _ensure_disk_strategy(disk_strategy: str) -> str:
-    normalized = disk_strategy.lower().replace("-", "_")
-    aliases = {
-        "partition": "hash_partition",
-        "hash": "hash_partition",
-        "hash_partitioning": "hash_partition",
-        "external": "external_sort",
-        "sort": "external_sort",
-        "external-sort": "external_sort",
-    }
-    normalized = aliases.get(normalized, normalized)
-    if normalized not in {"sqlite", "hash_partition", "external_sort"}:
-        raise InvalidInputError(
-            "disk_strategy must be one of: 'sqlite', 'hash_partition', 'external_sort'"
-        )
-    return normalized
-
-
-def _disk_compare_backend(disk_strategy: str) -> Callable[..., CompareResult]:
-    if disk_strategy == "hash_partition":
-        return compare_partitions
-    if disk_strategy == "external_sort":
-        return compare_external_sort
-    return compare_sqlite
-
-
-def _auto_decision(
-    first: Iterable[Any],
-    second: Iterable[Any],
-    *,
-    memory_limit: Optional[Union[str, int]],
-    temp_dir: Optional[str],
-    result_mode: str,
-) -> dict[str, Any]:
-    reasons: list[str] = []
-    estimated_items = _estimated_item_count(first, second)
-    estimated_bytes = (
-        estimated_items * _AUTO_BYTES_PER_ITEM if estimated_items is not None else None
-    )
-    base_decision: dict[str, Any] = {
-        "estimated_items": estimated_items,
-        "estimated_bytes": estimated_bytes,
-        "bytes_per_item_estimate": _AUTO_BYTES_PER_ITEM,
-        "memory_safety_factor": _AUTO_MEMORY_SAFETY_FACTOR,
-    }
-
-    if result_mode == "file":
-        reasons.append("result_mode='file'")
-        return {
-            **base_decision,
-            "use_disk": True,
-            "reason": ", ".join(reasons),
-            "selected_backend": "disk",
-        }
-
-    if temp_dir is not None:
-        reasons.append("temp_dir provided")
-        return {
-            **base_decision,
-            "use_disk": True,
-            "reason": ", ".join(reasons),
-            "selected_backend": "disk",
-        }
-
-    if memory_limit is not None:
-        limit_bytes = parse_size(memory_limit)
-        effective_limit = int(limit_bytes * _AUTO_MEMORY_SAFETY_FACTOR)
-        if estimated_bytes is None:
-            reasons.append("memory_limit provided for unsized input")
-            use_disk = True
-        else:
-            use_disk = estimated_bytes > effective_limit
-            if use_disk:
-                reasons.append("estimated input size exceeds effective memory_limit")
-            else:
-                reasons.append("estimated input size fits effective memory_limit")
-        return {
-            **base_decision,
-            "use_disk": use_disk,
-            "reason": ", ".join(reasons),
-            "memory_limit_bytes": limit_bytes,
-            "effective_memory_limit_bytes": effective_limit,
-            "selected_backend": "disk" if use_disk else "memory",
-        }
-
-    return {
-        **base_decision,
-        "use_disk": False,
-        "reason": "default memory backend",
-        "selected_backend": "memory",
-    }
-
-
-def _estimated_item_count(*sources: Iterable[Any]) -> Optional[int]:
-    total = 0
-    for source in sources:
-        if not isinstance(source, Sized):
-            return None
-        total += len(source)
-    return total
