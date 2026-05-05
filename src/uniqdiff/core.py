@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from typing import Any, Optional, Union
 
 from uniqdiff._typing import KeySpec, Normalizer
@@ -19,6 +19,7 @@ from uniqdiff.storage import (
     duplicates_partitions,
     duplicates_sqlite,
 )
+from uniqdiff.streaming import ResultRow, iter_sorted_diff
 from uniqdiff.tokens import make_token_factory
 
 
@@ -226,6 +227,29 @@ def compare_iter(first: Iterable[Any], second: Iterable[Any], **kwargs: Any) -> 
     """Compare generic iterables or generators."""
 
     return compare(first, second, **kwargs)
+
+
+def compare_sorted_iter(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec = None,
+    normalizer: Optional[Normalizer] = None,
+    include_common: bool = False,
+    include_duplicates: bool = False,
+    validate_sorted: bool = True,
+) -> Iterator[ResultRow]:
+    """Stream exact diff rows for inputs sorted by comparison token."""
+
+    return iter_sorted_diff(
+        first,
+        second,
+        key=key,
+        normalizer=normalizer,
+        include_common=include_common,
+        include_duplicates=include_duplicates,
+        validate_sorted=validate_sorted,
+    )
 
 
 def compare_files(

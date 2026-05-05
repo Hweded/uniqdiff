@@ -20,6 +20,7 @@ The following names are part of the 1.0 engine contract:
 - `compare_by_key`;
 - `compare_by_hash`;
 - `compare_iter`;
+- `compare_sorted_iter`;
 - `compare_streams`;
 - `compare_files`;
 - `compare_sources`;

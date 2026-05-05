@@ -81,6 +81,17 @@ CSV/TSV options:
 
 Alias for iterable/generator-oriented usage.
 
+## `compare_sorted_iter(first, second, ...)`
+
+Streams exact `section`/`value` rows for iterable inputs that are already sorted
+by comparison token. This is the higher-level engine convenience wrapper around
+`iter_sorted_diff()`.
+
+It accepts `key`, `normalizer`, `include_common`, `include_duplicates`, and
+`validate_sorted`.
+
+It returns an iterator, not `CompareResult`.
+
 ## `compare_streams(stream_a, stream_b, ...)`
 
 Alias for file-like or streaming parsed inputs.

@@ -1,7 +1,7 @@
 # Streaming Diff
 
-`iter_sorted_diff()` provides exact streaming comparison for inputs that are
-already sorted by the comparison token.
+`compare_sorted_iter()` and `iter_sorted_diff()` provide exact streaming
+comparison for inputs that are already sorted by the comparison token.
 
 It is useful when:
 
@@ -13,12 +13,12 @@ It is useful when:
 ## Example
 
 ```python
-from uniqdiff import iter_sorted_diff
+from uniqdiff import compare_sorted_iter
 
 left = [{"id": 1}, {"id": 2}, {"id": 4}]
 right = [{"id": 2}, {"id": 3}, {"id": 4}]
 
-for row in iter_sorted_diff(left, right, key="id", include_common=True):
+for row in compare_sorted_iter(left, right, key="id", include_common=True):
     print(row)
 ```
 
@@ -38,7 +38,7 @@ value in an equal-token group is treated as the representative row; later values
 in the same group are emitted as duplicates.
 
 ```python
-rows = iter_sorted_diff(
+rows = compare_sorted_iter(
     left,
     right,
     key="id",
@@ -69,8 +69,9 @@ sortable `key`.
 
 ## Limitations
 
-`iter_sorted_diff()` is exact, but it is not a general replacement for
-`compare()`.
+`compare_sorted_iter()` is exact, but it is not a general replacement for
+`compare()`. `iter_sorted_diff()` is the lower-level helper with the same row
+semantics.
 
 It does not:
 

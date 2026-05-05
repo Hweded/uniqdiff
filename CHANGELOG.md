@@ -9,6 +9,8 @@
 - Documented the smarter auto-mode heuristic and auto disk strategy selection.
 - Added `iter_sorted_diff()` for exact streaming comparison of already sorted
   inputs without temporary files.
+- Added `compare_sorted_iter()` as the public engine convenience wrapper for
+  sorted streaming comparison.
 
 ## 1.0.0
 

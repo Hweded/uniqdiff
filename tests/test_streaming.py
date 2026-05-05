@@ -1,6 +1,6 @@
 import pytest
 
-from uniqdiff import InvalidInputError, iter_sorted_diff
+from uniqdiff import InvalidInputError, compare_sorted_iter, iter_sorted_diff
 
 
 def test_iter_sorted_diff_streams_unique_rows():
@@ -66,3 +66,20 @@ def test_iter_sorted_diff_can_skip_sorted_validation():
 def test_iter_sorted_diff_rejects_unorderable_tokens():
     with pytest.raises(InvalidInputError, match="orderable"):
         list(iter_sorted_diff([object()], [object()]))
+
+
+def test_compare_sorted_iter_wraps_streaming_diff():
+    rows = list(
+        compare_sorted_iter(
+            [{"id": 1}, {"id": 2}],
+            [{"id": 2}, {"id": 3}],
+            key="id",
+            include_common=True,
+        )
+    )
+
+    assert rows == [
+        {"section": "only_in_first", "value": {"id": 1}},
+        {"section": "common", "value": {"id": 2}},
+        {"section": "only_in_second", "value": {"id": 3}},
+    ]
