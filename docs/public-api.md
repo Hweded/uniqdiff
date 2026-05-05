@@ -1,0 +1,76 @@
+# Public API Boundary
+
+This page defines the public module boundary for `uniqdiff` 1.0.
+
+The preferred public import path is the root package:
+
+```python
+from uniqdiff import compare, CompareResult, iter_result_values
+```
+
+## Stable Root Exports
+
+The following names are part of the 1.0 engine contract:
+
+- `compare`;
+- `diff`;
+- `unique`;
+- `intersection`;
+- `duplicates`;
+- `compare_by_key`;
+- `compare_by_hash`;
+- `compare_iter`;
+- `compare_streams`;
+- `compare_files`;
+- `compare_sources`;
+- `duplicates_source`;
+- `CompareResult`;
+- `CompareStats`;
+- `iter_result_rows`;
+- `iter_result_values`;
+- connector protocol and registry helpers;
+- built-in local connectors;
+- documented exception classes.
+
+These names should not be removed or renamed in a minor release after 1.0.
+
+## Public Modules
+
+These modules may be imported directly when users need a narrower namespace:
+
+- `uniqdiff`: preferred stable facade;
+- `uniqdiff.connectors`: connector protocol, built-in connectors, registry helpers;
+- `uniqdiff.exceptions`: documented exception classes;
+- `uniqdiff.normalizers`: built-in normalizer helpers;
+- `uniqdiff.output`: lazy result readers;
+- `uniqdiff.result`: result dataclasses;
+- `uniqdiff.io`: low-level local file readers;
+- `uniqdiff.bloom`: probabilistic helper API;
+- `uniqdiff.fuzzy`: approximate string helper API.
+
+`uniqdiff.bloom` and `uniqdiff.fuzzy` are public helper modules, but they are not part
+of the exact comparison semantics. They must remain clearly documented as
+probabilistic or approximate.
+
+## Internal Modules
+
+These modules are implementation details and are not covered by the 1.0 compatibility
+contract:
+
+- modules whose name starts with `_`, such as `uniqdiff._utils` and `uniqdiff._typing`;
+- `uniqdiff.cli`;
+- `uniqdiff.core`;
+- `uniqdiff.disk`;
+- `uniqdiff.storage`;
+- `uniqdiff.strategies`;
+- individual backend modules under `uniqdiff.storage`.
+
+Downstream tools should not depend on these modules directly. If a downstream tool
+needs behavior that currently exists only in an internal module, promote a small,
+documented wrapper through the public facade instead of importing the internal module.
+
+## Compatibility Rule
+
+After 1.0, compatibility is defined by documented behavior, root exports, result
+schemas, CLI contracts, and documented module APIs. Internal modules may change in
+minor releases as long as the public engine contract remains stable.

@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "uniqdiff"
+version = "1.0.0"
+description = "Stable exact comparison engine foundation for Python and the UniqTools ecosystem."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "Apache-2.0"
+authors = [
+  { name = "uniqdiff maintainers" }
+]
+keywords = ["diff", "unique", "deduplication", "data", "comparison"]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Utilities",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+  "hypothesis>=6.88",
+  "ruff>=0.4",
+  "mypy>=1.8",
+  "build>=1.0",
+  "twine>=5.0",
+]
+fuzzy = ["rapidfuzz>=3.0"]
+parquet = ["pyarrow>=15.0"]
+
+[project.urls]
+Homepage = "https://github.com/Hweded/uniqdiff"
+Documentation = "https://github.com/Hweded/uniqdiff/tree/main/docs"
+Issues = "https://github.com/Hweded/uniqdiff/issues"
+Source = "https://github.com/Hweded/uniqdiff"
+
+[project.scripts]
+uniqdiff = "uniqdiff.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+uniqdiff = ["py.typed"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+extend-exclude = [
+  ".pip-tmp",
+  ".pytest-tmp",
+  "pytest_tmp",
+  "pytest-cache-files-*",
+  "benchmarks/.tmp",
+  "benchmarks_tmp",
+  ".tmp",
+  "build_tmp",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = [
+  # Keep Python 3.9 syntax while using postponed annotations.
+  "UP007",
+  "UP045",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q -p no:cacheprovider"
+pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+packages = ["uniqdiff"]
