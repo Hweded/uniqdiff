@@ -58,7 +58,7 @@ The internal engine is intentionally split into small layers:
 - `core`: public API orchestration and result assembly;
 - `tokens`: key extraction, normalizer application, and canonical token creation;
 - `planner`: mode normalization, auto-mode decision metadata, and backend selection;
-- `storage`: disk-backed exact comparison backends;
+- `storage`: memory and disk-backed exact comparison backends;
 - `connectors`: source adapters and the connector registry;
 - `output`: file result writing and lazy result readers.
 
