@@ -48,6 +48,8 @@ Performance depends on:
 
 - Use memory mode for small data.
 - Use SQLite disk mode first for large data.
+- Use `mode="auto", disk_strategy="auto"` when you want the planner to choose
+  between SQLite, hash partitioning, and external sort.
 - Try hash partitioning when one large SQLite index is undesirable.
 - Try external sort when chunked sorting fits your workload.
 - Use file result mode for large outputs.

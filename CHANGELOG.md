@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Improved `mode="auto"` decision metadata with requested/selected disk strategy,
+  chunk size, ordering, common, and duplicate flags.
+- Added `disk_strategy="auto"` so the planner can choose between SQLite, hash
+  partitioning, and external sort for disk-backed workloads.
+- Documented the smarter auto-mode heuristic and auto disk strategy selection.
+
 ## 1.0.0
 
 - Released `uniqdiff` as a stable exact comparison engine for Python and the

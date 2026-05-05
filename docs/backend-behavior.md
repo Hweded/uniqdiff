@@ -34,6 +34,8 @@ Selected by:
 
 - `mode="disk", disk_strategy="sqlite"`;
 - `mode="auto"` when disk mode is selected and no other disk strategy is provided.
+- `mode="auto", disk_strategy="auto"` for small disk-backed jobs, unsized inputs,
+  file result mode, or order-preserving output.
 
 Behavior:
 
@@ -61,6 +63,8 @@ Status: stable 1.0 backend, documented as an advanced mode.
 Selected by:
 
 - `mode="disk", disk_strategy="hash_partition"`.
+- `mode="auto", disk_strategy="auto"` for large unordered workloads where
+  partition-by-partition processing is preferred.
 
 Behavior:
 
@@ -87,6 +91,8 @@ Status: stable 1.0 backend, documented as an advanced mode.
 Selected by:
 
 - `mode="disk", disk_strategy="external_sort"`.
+- `mode="auto", disk_strategy="auto"` when the planner chooses chunk-sort-merge
+  processing, for example when a disk limit is configured.
 
 Behavior:
 
@@ -124,12 +130,17 @@ Behavior:
 - selects disk when `temp_dir` is provided;
 - uses `memory_limit` and a safety factor for sized inputs;
 - selects disk for unsized input when `memory_limit` is provided.
+- can select a disk backend when `disk_strategy="auto"` is requested.
 
 The decision is available in:
 
 ```python
 result.metadata["auto_decision"]
 ```
+
+Useful decision fields include `estimated_items`, `estimated_bytes`,
+`selected_backend`, `requested_disk_strategy`, `selected_disk_strategy`, and
+`reason`.
 
 ## File Result Mode
 

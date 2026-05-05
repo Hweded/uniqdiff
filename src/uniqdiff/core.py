@@ -63,6 +63,8 @@ def compare(
         chunk_size=chunk_size,
         output=output,
         preserve_order=preserve_order,
+        include_common=include_common,
+        include_duplicates=include_duplicates,
     )
     token_factory = make_token_factory(key=key, normalizer=normalizer)
 

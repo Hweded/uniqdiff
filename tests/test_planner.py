@@ -11,6 +11,7 @@ from uniqdiff.planner import (
 def test_ensure_disk_strategy_accepts_aliases():
     assert ensure_disk_strategy("partition") == "hash_partition"
     assert ensure_disk_strategy("external-sort") == "external_sort"
+    assert ensure_disk_strategy("auto") == "auto"
 
 
 def test_ensure_disk_strategy_rejects_unknown_value():
@@ -43,6 +44,39 @@ def test_auto_decision_uses_disk_for_file_result_mode():
 
     assert decision["use_disk"] is True
     assert decision["reason"] == "result_mode='file'"
+    assert decision["selected_disk_strategy"] == "sqlite"
+
+
+def test_auto_decision_can_select_hash_partition_for_large_unordered_inputs():
+    decision = auto_decision_for_sources(
+        range(1_000_001),
+        range(1_000_001),
+        memory_limit="1MB",
+        temp_dir=None,
+        result_mode="memory",
+        disk_strategy="auto",
+        preserve_order=False,
+    )
+
+    assert decision["use_disk"] is True
+    assert decision["selected_disk_strategy"] == "hash_partition"
+    assert decision["requested_disk_strategy"] == "auto"
+
+
+def test_auto_decision_can_select_external_sort_when_disk_limit_is_set():
+    decision = auto_decision_for_sources(
+        range(10),
+        range(10),
+        memory_limit="1B",
+        temp_dir=None,
+        result_mode="memory",
+        disk_strategy="auto",
+        preserve_order=False,
+        disk_limit="10GB",
+    )
+
+    assert decision["use_disk"] is True
+    assert decision["selected_disk_strategy"] == "external_sort"
 
 
 def test_build_execution_plan_rejects_file_result_without_output():
@@ -84,3 +118,25 @@ def test_build_execution_plan_records_metadata():
     assert plan.partition_count == 8
     assert plan.metadata["preserve_order"] is False
     assert plan.metadata["auto_decision"]["selected_backend"] == "disk"
+
+
+def test_build_execution_plan_resolves_auto_disk_strategy():
+    plan = build_execution_plan(
+        range(1_000_001),
+        range(1_000_001),
+        mode="auto",
+        result_mode="memory",
+        disk_strategy="auto",
+        partition_count=None,
+        memory_limit="1MB",
+        temp_dir=None,
+        disk_limit=None,
+        chunk_size=10,
+        output=None,
+        preserve_order=False,
+    )
+
+    assert plan.use_disk is True
+    assert plan.disk_strategy == "hash_partition"
+    assert plan.metadata["requested_disk_strategy"] == "auto"
+    assert plan.metadata["disk_strategy"] == "hash_partition"

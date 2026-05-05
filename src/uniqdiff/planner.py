@@ -14,6 +14,8 @@ from uniqdiff.storage.protocols import CompareBackend
 
 _AUTO_BYTES_PER_ITEM = 512
 _AUTO_MEMORY_SAFETY_FACTOR = 0.70
+_AUTO_SQLITE_ITEM_LIMIT = 1_000_000
+_AUTO_HASH_PARTITION_ITEM_LIMIT = 20_000_000
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,8 @@ def build_execution_plan(
     chunk_size: int,
     output: Optional[str],
     preserve_order: bool,
+    include_common: bool = False,
+    include_duplicates: bool = False,
 ) -> ExecutionPlan:
     """Build a normalized plan for memory, disk, or auto comparison."""
 
@@ -64,9 +68,20 @@ def build_execution_plan(
         memory_limit=memory_limit,
         temp_dir=temp_dir,
         result_mode=selected_result_mode,
+        disk_strategy=selected_disk_strategy,
+        chunk_size=chunk_size,
+        include_common=include_common,
+        include_duplicates=include_duplicates,
+        preserve_order=preserve_order,
+        disk_limit=disk_limit,
     )
     use_disk = selected_mode == "disk" or (
         selected_mode == "auto" and auto_decision["use_disk"]
+    )
+    resolved_disk_strategy = (
+        auto_decision["selected_disk_strategy"]
+        if selected_disk_strategy == "auto"
+        else selected_disk_strategy
     )
 
     metadata = {
@@ -75,7 +90,8 @@ def build_execution_plan(
         "memory_limit": memory_limit,
         "temp_dir": temp_dir,
         "disk_limit": disk_limit,
-        "disk_strategy": selected_disk_strategy,
+        "disk_strategy": resolved_disk_strategy,
+        "requested_disk_strategy": selected_disk_strategy,
         "partition_count": selected_partition_count,
         "result_mode": selected_result_mode,
         "preserve_order": preserve_order,
@@ -85,7 +101,7 @@ def build_execution_plan(
     return ExecutionPlan(
         mode=selected_mode,
         result_mode=selected_result_mode,
-        disk_strategy=selected_disk_strategy,
+        disk_strategy=resolved_disk_strategy,
         partition_count=selected_partition_count,
         use_disk=use_disk,
         auto_decision=auto_decision if selected_mode == "auto" else None,
@@ -144,9 +160,9 @@ def ensure_disk_strategy(disk_strategy: str) -> str:
         "external-sort": "external_sort",
     }
     normalized = aliases.get(normalized, normalized)
-    if normalized not in {"sqlite", "hash_partition", "external_sort"}:
+    if normalized not in {"sqlite", "hash_partition", "external_sort", "auto"}:
         raise InvalidInputError(
-            "disk_strategy must be one of: 'sqlite', 'hash_partition', 'external_sort'"
+            "disk_strategy must be one of: 'sqlite', 'hash_partition', 'external_sort', 'auto'"
         )
     return normalized
 
@@ -168,6 +184,12 @@ def auto_decision_for_sources(
     memory_limit: Optional[Union[str, int]],
     temp_dir: Optional[str],
     result_mode: str,
+    disk_strategy: str = "sqlite",
+    chunk_size: int = 100_000,
+    include_common: bool = False,
+    include_duplicates: bool = False,
+    preserve_order: bool = True,
+    disk_limit: Optional[Union[str, int]] = None,
 ) -> dict[str, Any]:
     """Decide whether auto mode should use memory or disk."""
 
@@ -181,6 +203,21 @@ def auto_decision_for_sources(
         "estimated_bytes": estimated_bytes,
         "bytes_per_item_estimate": _AUTO_BYTES_PER_ITEM,
         "memory_safety_factor": _AUTO_MEMORY_SAFETY_FACTOR,
+        "requested_disk_strategy": disk_strategy,
+        "selected_disk_strategy": _select_auto_disk_strategy(
+            estimated_items=estimated_items,
+            disk_strategy=disk_strategy,
+            result_mode=result_mode,
+            include_common=include_common,
+            include_duplicates=include_duplicates,
+            preserve_order=preserve_order,
+            disk_limit=disk_limit,
+        ),
+        "chunk_size": chunk_size,
+        "include_common": include_common,
+        "include_duplicates": include_duplicates,
+        "preserve_order": preserve_order,
+        "disk_limit": disk_limit,
     }
 
     if result_mode == "file":
@@ -239,3 +276,33 @@ def estimated_item_count(*sources: Iterable[Any]) -> Optional[int]:
             return None
         total += len(source)
     return total
+
+
+def _select_auto_disk_strategy(
+    *,
+    estimated_items: Optional[int],
+    disk_strategy: str,
+    result_mode: str,
+    include_common: bool,
+    include_duplicates: bool,
+    preserve_order: bool,
+    disk_limit: Optional[Union[str, int]],
+) -> str:
+    if disk_strategy != "auto":
+        return disk_strategy
+
+    if result_mode == "file":
+        return "sqlite"
+    if preserve_order:
+        return "sqlite"
+    if disk_limit is not None:
+        return "external_sort"
+    if estimated_items is None:
+        return "sqlite"
+    if include_duplicates and estimated_items > _AUTO_SQLITE_ITEM_LIMIT:
+        return "hash_partition"
+    if include_common and estimated_items > _AUTO_HASH_PARTITION_ITEM_LIMIT:
+        return "external_sort"
+    if estimated_items > _AUTO_SQLITE_ITEM_LIMIT:
+        return "hash_partition"
+    return "sqlite"
