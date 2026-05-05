@@ -358,7 +358,7 @@ def _fetch_section(
         ORDER BY item.ordinal
         """
     )
-    return [_from_blob(row[0]) for row in cursor.fetchall()]
+    return [_from_blob(row[0]) for row in cursor]
 
 
 def _iter_section(
@@ -403,7 +403,7 @@ def _fetch_duplicates(conn: sqlite3.Connection, table: str) -> list[Any]:
         ORDER BY item.ordinal
         """
     )
-    return [_from_blob(row[0]) for row in cursor.fetchall()]
+    return [_from_blob(row[0]) for row in cursor]
 
 
 def _iter_duplicates(conn: sqlite3.Connection, table: str) -> Iterable[Any]:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence, Sized
-from dataclasses import asdict, dataclass, is_dataclass
+from dataclasses import dataclass
 from typing import Any, Optional, Union
 
 from uniqdiff._typing import KeySpec, Normalizer
@@ -26,6 +26,7 @@ from uniqdiff.storage import (
 
 _AUTO_BYTES_PER_ITEM = 512
 _AUTO_MEMORY_SAFETY_FACTOR = 0.70
+_SCALAR_TOKEN_TYPES = {str, int, float, bool, bytes, type(None)}
 
 
 def compare(
@@ -87,6 +88,7 @@ def compare(
     )
     use_disk = selected_mode == "disk" or (selected_mode == "auto" and auto_decision["use_disk"])
     metadata["auto_decision"] = auto_decision if selected_mode == "auto" else None
+    token_factory = _make_token_factory(key=key, normalizer=normalizer)
 
     if use_disk:
         disk_compare = _disk_compare_backend(selected_disk_strategy)
@@ -96,7 +98,7 @@ def compare(
         result = disk_compare(
             first,
             second,
-            token_factory=lambda item: _comparison_token(item, key=key, normalizer=normalizer),
+            token_factory=token_factory,
             include_common=include_common,
             include_duplicates=include_duplicates,
             chunk_size=chunk_size,
@@ -118,14 +120,12 @@ def compare(
 
     left = _index_items(
         first,
-        key=key,
-        normalizer=normalizer,
+        token_factory=token_factory,
         collect_duplicates=include_duplicates,
     )
     right = _index_items(
         second,
-        key=key,
-        normalizer=normalizer,
+        token_factory=token_factory,
         collect_duplicates=include_duplicates,
     )
 
@@ -231,10 +231,11 @@ def duplicates(
         result_mode="memory",
     )
     if selected_mode == "disk" or (selected_mode == "auto" and auto_decision["use_disk"]):
+        token_factory = _make_token_factory(key=key, normalizer=normalizer)
         if selected_disk_strategy == "hash_partition":
             return duplicates_partitions(
                 data,
-                token_factory=lambda item: _comparison_token(item, key=key, normalizer=normalizer),
+                token_factory=token_factory,
                 chunk_size=chunk_size,
                 temp_dir=temp_dir,
                 disk_limit=disk_limit,
@@ -243,19 +244,20 @@ def duplicates(
         if selected_disk_strategy == "external_sort":
             return duplicates_external_sort(
                 data,
-                token_factory=lambda item: _comparison_token(item, key=key, normalizer=normalizer),
+                token_factory=token_factory,
                 chunk_size=chunk_size,
                 temp_dir=temp_dir,
                 disk_limit=disk_limit,
             )
         return duplicates_sqlite(
             data,
-            token_factory=lambda item: _comparison_token(item, key=key, normalizer=normalizer),
+            token_factory=token_factory,
             chunk_size=chunk_size,
             temp_dir=temp_dir,
             disk_limit=disk_limit,
         )
-    index = _index_items(data, key=key, normalizer=normalizer, collect_duplicates=True)
+    token_factory = _make_token_factory(key=key, normalizer=normalizer)
+    index = _index_items(data, token_factory=token_factory, collect_duplicates=True)
     return index.duplicates or []
 
 
@@ -392,8 +394,7 @@ class _MemoryIndex:
 def _index_items(
     items: Iterable[Any],
     *,
-    key: KeySpec,
-    normalizer: Optional[Normalizer],
+    token_factory: Callable[[Any], Any],
     collect_duplicates: bool,
 ) -> _MemoryIndex:
     first_by_token: dict[Any, Any] = {}
@@ -402,7 +403,7 @@ def _index_items(
     )
     item_count = 0
     for item in items:
-        token = _comparison_token(item, key=key, normalizer=normalizer)
+        token = token_factory(item)
         if token in first_by_token:
             if duplicate_values is not None:
                 duplicate_values[token].append(item)
@@ -427,6 +428,64 @@ def _first_values(first_by_token: dict[Any, Any], keys: Iterable[Any]) -> list[A
     return [first_by_token[key] for key in keys]
 
 
+def _make_token_factory(
+    *,
+    key: KeySpec,
+    normalizer: Optional[Normalizer],
+) -> Callable[[Any], Any]:
+    if key is None:
+        if normalizer is None:
+            return _canonicalize_token
+
+        def token_from_item(item: Any) -> Any:
+            return _normalize_and_canonicalize(item, item=item, normalizer=normalizer)
+
+        return token_from_item
+
+    if isinstance(key, str):
+        if normalizer is None:
+
+            def token_from_str_key(item: Any) -> Any:
+                return _canonicalize_token(_extract_str_key(item, key))
+
+            return token_from_str_key
+
+        def normalized_token_from_str_key(item: Any) -> Any:
+            value = _extract_str_key(item, key)
+            return _normalize_and_canonicalize(value, item=item, normalizer=normalizer)
+
+        return normalized_token_from_str_key
+
+    if isinstance(key, (tuple, list)):
+        parts = tuple(key)
+
+        def token_from_key_parts(item: Any) -> Any:
+            value = tuple(_extract_key(item, part) for part in parts)
+            if normalizer is not None:
+                return _normalize_and_canonicalize(value, item=item, normalizer=normalizer)
+            return _canonicalize_token(value)
+
+        return token_from_key_parts
+
+    if callable(key):
+
+        def token_from_callable(item: Any) -> Any:
+            try:
+                value = key(item)
+            except Exception as exc:
+                raise KeyExtractionError(f"Key function failed for item {item!r}") from exc
+            if normalizer is not None:
+                return _normalize_and_canonicalize(value, item=item, normalizer=normalizer)
+            return _canonicalize_token(value)
+
+        return token_from_callable
+
+    def invalid_key_token(item: Any) -> Any:
+        return _comparison_token(item, key=key, normalizer=normalizer)
+
+    return invalid_key_token
+
+
 def _comparison_token(item: Any, *, key: KeySpec, normalizer: Optional[Normalizer]) -> Any:
     value = _extract_key(item, key) if key is not None else item
     if normalizer is not None:
@@ -434,7 +493,45 @@ def _comparison_token(item: Any, *, key: KeySpec, normalizer: Optional[Normalize
             value = normalizer(value)
         except Exception as exc:
             raise NormalizationError(f"Normalizer failed for item {item!r}") from exc
+    return _canonicalize_token(value)
+
+
+def _normalize_and_canonicalize(
+    value: Any,
+    *,
+    item: Any,
+    normalizer: Normalizer,
+) -> Any:
+    try:
+        normalized = normalizer(value)
+    except Exception as exc:
+        raise NormalizationError(f"Normalizer failed for item {item!r}") from exc
+    return _canonicalize_token(normalized)
+
+
+def _canonicalize_token(value: Any) -> Any:
+    if type(value) in _SCALAR_TOKEN_TYPES:
+        return value
     return canonicalize(value)
+
+
+def _extract_str_key(item: Any, key: str) -> Any:
+    if type(item) is dict:
+        try:
+            return item[key]
+        except KeyError as exc:
+            raise KeyExtractionError(f"Missing key {key!r} in item {item!r}") from exc
+
+    if isinstance(item, dict):
+        try:
+            return item[key]
+        except KeyError as exc:
+            raise KeyExtractionError(f"Missing key {key!r} in item {item!r}") from exc
+
+    try:
+        return getattr(item, key)
+    except AttributeError as exc:
+        raise KeyExtractionError(f"Missing attribute {key!r} in item {item!r}") from exc
 
 
 def _extract_key(item: Any, key: KeySpec) -> Any:
@@ -450,18 +547,7 @@ def _extract_key(item: Any, key: KeySpec) -> Any:
     if not isinstance(key, str):
         raise KeyExtractionError("key must be a string, sequence of strings, callable, or None")
 
-    source = asdict(item) if is_dataclass(item) and not isinstance(item, type) else item
-
-    if isinstance(source, dict):
-        try:
-            return source[key]
-        except KeyError as exc:
-            raise KeyExtractionError(f"Missing key {key!r} in item {item!r}") from exc
-
-    try:
-        return getattr(source, key)
-    except AttributeError as exc:
-        raise KeyExtractionError(f"Missing attribute {key!r} in item {item!r}") from exc
+    return _extract_str_key(item, key)
 
 
 def _ensure_disk_strategy(disk_strategy: str) -> str:
