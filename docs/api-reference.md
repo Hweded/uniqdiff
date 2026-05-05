@@ -92,6 +92,19 @@ It accepts `key`, `normalizer`, `include_common`, `include_duplicates`, and
 
 It returns an iterator, not `CompareResult`.
 
+## `write_sorted_diff(first, second, output, ...)`
+
+Writes exact sorted streaming diff rows directly to a `.jsonl` or `.csv` file and
+returns the number of rows written.
+
+This helper uses the same sorted-input requirements and row schema as
+`iter_sorted_diff()`.
+
+## `write_sorted_diff_file(first, second, output, ...)`
+
+Engine facade wrapper around `write_sorted_diff()`. Use this when you want the
+public API naming to clearly communicate that output is written to a result file.
+
 ## `compare_streams(stream_a, stream_b, ...)`
 
 Alias for file-like or streaming parsed inputs.

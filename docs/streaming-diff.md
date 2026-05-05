@@ -55,6 +55,28 @@ Possible sections:
 - `duplicates_first`;
 - `duplicates_second`.
 
+## Direct File Output
+
+Use `write_sorted_diff_file()` to stream sorted diff rows directly to JSONL or
+CSV output:
+
+```python
+from uniqdiff import write_sorted_diff_file
+
+rows_written = write_sorted_diff_file(
+    left,
+    right,
+    "diff.jsonl",
+    key="id",
+    include_common=True,
+)
+```
+
+The output uses the same `section` / `value` schema as file result mode and can
+be read with `iter_result_rows()` or `iter_result_values()`.
+
+`write_sorted_diff()` is the lower-level helper with the same behavior.
+
 ## Requirements
 
 Both inputs must be sorted by the same token produced from `key` and

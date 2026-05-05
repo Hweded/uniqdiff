@@ -11,6 +11,8 @@
   inputs without temporary files.
 - Added `compare_sorted_iter()` as the public engine convenience wrapper for
   sorted streaming comparison.
+- Added `write_sorted_diff()` and `write_sorted_diff_file()` for direct JSONL/CSV
+  output from sorted streaming comparison.
 
 ## 1.0.0
 

@@ -30,6 +30,7 @@ from uniqdiff.core import (
     duplicates_source,
     intersection,
     unique,
+    write_sorted_diff_file,
 )
 from uniqdiff.exceptions import (
     ComparatorError,
@@ -47,7 +48,7 @@ from uniqdiff.fuzzy import compare_fuzzy_strings
 from uniqdiff.normalizers import compose_normalizers, string_normalizer
 from uniqdiff.output import iter_result_rows, iter_result_values
 from uniqdiff.result import CompareResult, CompareStats
-from uniqdiff.streaming import iter_sorted_diff
+from uniqdiff.streaming import iter_sorted_diff, write_sorted_diff
 
 __all__ = [
     "ComparatorError",
@@ -97,4 +98,6 @@ __all__ = [
     "register_connector",
     "string_normalizer",
     "unique",
+    "write_sorted_diff",
+    "write_sorted_diff_file",
 ]

@@ -30,6 +30,8 @@ The following names are part of the 1.0 engine contract:
 - `iter_result_rows`;
 - `iter_result_values`;
 - `iter_sorted_diff`;
+- `write_sorted_diff`;
+- `write_sorted_diff_file`;
 - connector protocol and registry helpers;
 - built-in local connectors;
 - documented exception classes.

@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from uniqdiff._typing import KeySpec, Normalizer
 from uniqdiff.exceptions import InvalidInputError
+from uniqdiff.output import StreamingResultWriter
 from uniqdiff.tokens import TokenFactory, make_token_factory
 
 ResultRow = dict[str, Any]
@@ -71,6 +72,35 @@ def iter_sorted_diff(
             yield from _duplicate_rows("duplicates_second", right_item.values)
         left_item = next(left_groups, None)
         right_item = next(right_groups, None)
+
+
+def write_sorted_diff(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    output: str,
+    *,
+    key: KeySpec = None,
+    normalizer: Optional[Normalizer] = None,
+    include_common: bool = False,
+    include_duplicates: bool = False,
+    validate_sorted: bool = True,
+) -> int:
+    """Write sorted streaming diff rows to JSONL or CSV and return row count."""
+
+    rows_written = 0
+    with StreamingResultWriter(output) as writer:
+        for row in iter_sorted_diff(
+            first,
+            second,
+            key=key,
+            normalizer=normalizer,
+            include_common=include_common,
+            include_duplicates=include_duplicates,
+            validate_sorted=validate_sorted,
+        ):
+            writer.write(row["section"], row["value"])
+            rows_written += 1
+    return rows_written
 
 
 def _group_sorted(

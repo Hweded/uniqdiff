@@ -19,7 +19,7 @@ from uniqdiff.storage import (
     duplicates_partitions,
     duplicates_sqlite,
 )
-from uniqdiff.streaming import ResultRow, iter_sorted_diff
+from uniqdiff.streaming import ResultRow, iter_sorted_diff, write_sorted_diff
 from uniqdiff.tokens import make_token_factory
 
 
@@ -244,6 +244,31 @@ def compare_sorted_iter(
     return iter_sorted_diff(
         first,
         second,
+        key=key,
+        normalizer=normalizer,
+        include_common=include_common,
+        include_duplicates=include_duplicates,
+        validate_sorted=validate_sorted,
+    )
+
+
+def write_sorted_diff_file(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    output: str,
+    *,
+    key: KeySpec = None,
+    normalizer: Optional[Normalizer] = None,
+    include_common: bool = False,
+    include_duplicates: bool = False,
+    validate_sorted: bool = True,
+) -> int:
+    """Write sorted streaming diff rows directly to JSONL or CSV output."""
+
+    return write_sorted_diff(
+        first,
+        second,
+        output,
         key=key,
         normalizer=normalizer,
         include_common=include_common,

@@ -1,6 +1,16 @@
+import shutil
+from pathlib import Path
+
 import pytest
 
-from uniqdiff import InvalidInputError, compare_sorted_iter, iter_sorted_diff
+from uniqdiff import (
+    InvalidInputError,
+    compare_sorted_iter,
+    iter_result_rows,
+    iter_sorted_diff,
+    write_sorted_diff,
+    write_sorted_diff_file,
+)
 
 
 def test_iter_sorted_diff_streams_unique_rows():
@@ -83,3 +93,59 @@ def test_compare_sorted_iter_wraps_streaming_diff():
         {"section": "common", "value": {"id": 2}},
         {"section": "only_in_second", "value": {"id": 3}},
     ]
+
+
+def test_write_sorted_diff_writes_jsonl():
+    workspace = _workspace("jsonl")
+    try:
+        output = workspace / "sorted-diff.jsonl"
+
+        count = write_sorted_diff(
+            [{"id": 1}, {"id": 2}],
+            [{"id": 2}, {"id": 3}],
+            str(output),
+            key="id",
+            include_common=True,
+        )
+
+        assert count == 3
+        assert list(iter_result_rows(output)) == [
+            {"section": "only_in_first", "value": {"id": 1}},
+            {"section": "common", "value": {"id": 2}},
+            {"section": "only_in_second", "value": {"id": 3}},
+        ]
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def test_write_sorted_diff_file_writes_csv():
+    workspace = _workspace("csv")
+    try:
+        output = workspace / "sorted-diff.csv"
+
+        count = write_sorted_diff_file(
+            [1, 2, 2],
+            [2, 3, 3],
+            str(output),
+            include_common=True,
+            include_duplicates=True,
+        )
+
+        assert count == 5
+        assert list(iter_result_rows(output)) == [
+            {"section": "only_in_first", "value": 1},
+            {"section": "common", "value": 2},
+            {"section": "duplicates_first", "value": 2},
+            {"section": "only_in_second", "value": 3},
+            {"section": "duplicates_second", "value": 3},
+        ]
+    finally:
+        shutil.rmtree(workspace, ignore_errors=True)
+
+
+def _workspace(name: str) -> Path:
+    path = Path.cwd() / ".tmp" / "streaming_tests" / name
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True)
+    return path
