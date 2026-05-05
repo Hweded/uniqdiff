@@ -17,7 +17,9 @@ Important parameters:
 - `chunk_size`: batch size for disk strategies;
 - `memory_limit`: used by `mode="auto"`;
 - `disk_limit`: safety limit for temporary disk usage;
-- `temp_dir`: temporary storage directory.
+- `temp_dir`: temporary storage directory;
+- `preserve_order`: keep first-seen order in memory mode. Set `False` when output
+  order is not important and set-style key operations are acceptable.
 
 Returns `CompareResult`.
 

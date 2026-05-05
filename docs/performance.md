@@ -9,6 +9,9 @@ Expected complexity:
 - time: `O(n + m)`;
 - memory: `O(n + m)`.
 
+When output ordering is not important, pass `preserve_order=False` to allow
+set-style key operations in memory mode.
+
 ## SQLite Backend
 
 Best default disk backend. It avoids optional dependencies and uses indexes.

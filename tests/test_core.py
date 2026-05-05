@@ -25,6 +25,16 @@ def test_compare_simple_lists():
     assert result.stats.second_count == 3
 
 
+def test_compare_can_skip_order_preservation():
+    result = compare([1, 2, 3], [3, 4, 5], include_common=True, preserve_order=False)
+
+    assert set(result.only_in_first) == {1, 2}
+    assert set(result.only_in_second) == {4, 5}
+    assert result.common == [3]
+    assert set(result.unique) == {1, 2, 4, 5}
+    assert result.metadata["preserve_order"] is False
+
+
 def test_unique_and_intersection_helpers():
     assert unique([1, 2], [2, 3]) == [1, 3]
     assert intersection([1, 2], [2, 3]) == [2]
