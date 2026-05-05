@@ -19,6 +19,7 @@ pytest-cache-files-*/
 *.jsonl.tmp
 *.csv.tmp
 tmp/
+.tmp/
 benchmarks/.tmp/
 benchmarks/results/
 benchmarks_tmp/

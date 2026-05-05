@@ -229,6 +229,10 @@ uniqtools check old.csv new.csv --key id --fail-on removed
 uniqtools report changes.jsonl --format html --output report.html
 ```
 
+The repository contains a runnable first sketch in
+`examples/uniqrowdiff_prototype`. It is not part of the `uniqdiff` public API;
+it exists to validate the ecosystem shape before a separate package is created.
+
 ## Compatibility Policy
 
 UniqTools should pin to the stable `uniqdiff` major version:
