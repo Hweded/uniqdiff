@@ -300,19 +300,26 @@ def _insert_items(
 ) -> int:
     count = 0
     batch: list[tuple[bytes, int, bytes]] = []
-    for item in items:
-        batch.append((_to_blob(token_factory(item)), count, _to_blob(item)))
-        count += 1
-        if len(batch) >= chunk_size:
+    committed = False
+    conn.execute("BEGIN")
+    try:
+        for item in items:
+            batch.append((_to_blob(token_factory(item)), count, _to_blob(item)))
+            count += 1
+            if len(batch) >= chunk_size:
+                _insert_batch(conn, table, batch)
+                _check_disk_limit(db_path, disk_limit)
+                batch.clear()
+
+        if batch:
             _insert_batch(conn, table, batch)
             _check_disk_limit(db_path, disk_limit)
-            batch.clear()
-
-    if batch:
-        _insert_batch(conn, table, batch)
-        _check_disk_limit(db_path, disk_limit)
-
-    return count
+        conn.commit()
+        committed = True
+        return count
+    finally:
+        if not committed:
+            conn.rollback()
 
 
 def _insert_batch(
@@ -324,7 +331,6 @@ def _insert_batch(
         f"INSERT INTO {table} (token, ordinal, payload) VALUES (?, ?, ?)",
         batch,
     )
-    conn.commit()
 
 
 def _fetch_section(
