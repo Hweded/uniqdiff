@@ -43,9 +43,6 @@ Key guides:
 - [CLI](docs/cli.md)
 - [Migration Guide](docs/migration-guide.md)
 - [Backward Compatibility](docs/backward-compatibility.md)
-- [Release 1.0 Checklist](docs/release-1.0.md)
-- [Release Notes 1.0](docs/release-notes-1.0.md)
-- [Release Process](docs/release-process.md)
 
 Project files:
 
