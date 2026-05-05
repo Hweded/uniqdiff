@@ -56,6 +56,37 @@ For JSON output:
 python benchmarks/run.py --size 100000 --json
 ```
 
+## uniqdiff mode profiling
+
+Use `benchmarks/profile_modes.py` when you need bottleneck-level profiling rather
+than only elapsed time and memory summaries:
+
+```bash
+python benchmarks/profile_modes.py --size 20000
+```
+
+The profiler uses standard-library `cProfile` and `tracemalloc`, then writes:
+
+- `benchmarks/results/profile-results.jsonl`;
+- `benchmarks/results/profile-report.md`.
+
+Profiled scenarios:
+
+- `memory`;
+- `memory_no_order`;
+- `sqlite`;
+- `hash_partition`;
+- `external_sort`;
+- `file_result`;
+- `sorted_stream`;
+- `sorted_stream_file`.
+
+For a focused run:
+
+```bash
+python benchmarks/profile_modes.py --size 10000 --scenario memory --scenario sqlite
+```
+
 Large target scenarios for release reports:
 
 - 1 million scalar values;

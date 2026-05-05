@@ -22,6 +22,7 @@ This directory contains project documentation for users and maintainers.
 - [Result Schema](result-schema.md)
 - [Auto Mode](auto-mode.md)
 - [Performance](performance.md)
+- [Profiling](profiling.md)
 - [Fuzzy Comparison](fuzzy.md)
 - [Bloom Filters](bloom-filters.md)
 - [Property-Based Tests](property-based-tests.md)

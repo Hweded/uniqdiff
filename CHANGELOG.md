@@ -13,6 +13,8 @@
   sorted streaming comparison.
 - Added `write_sorted_diff()` and `write_sorted_diff_file()` for direct JSONL/CSV
   output from sorted streaming comparison.
+- Added a reproducible profiling suite for memory, disk, file-result, and sorted
+  streaming modes, with JSONL output and Markdown reports.
 
 ## 1.0.0
 
