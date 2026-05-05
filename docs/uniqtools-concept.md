@@ -229,11 +229,9 @@ uniqtools check old.csv new.csv --key id --fail-on removed
 uniqtools report changes.jsonl --format html --output report.html
 ```
 
-The repository contains a runnable first sketch in
-`examples/uniqrowdiff_prototype`. It is not part of the `uniqdiff` public API;
-it exists to validate the ecosystem shape before a separate package is created.
-The `tools/uniqrowdiff` directory contains the next scaffold step: a small
-package layout with a library API, CLI, and tests.
+The first scaffold step now lives in a separate `uniqtools` repository as
+`packages/uniqrowdiff`. The `uniqdiff` repository should keep only engine code,
+engine documentation, and small integration examples.
 
 ## Compatibility Policy
 
