@@ -79,6 +79,79 @@ def test_file_result_mode_for_other_disk_backends(disk_strategy):
     assert any(row == {"section": "only_in_second", "value": 4} for row in rows)
 
 
+def test_hash_partition_file_result_mode_streams_sections():
+    output = FIXTURES / "result-mode-hash-partition-stream.jsonl"
+    output.unlink(missing_ok=True)
+    try:
+        result = compare(
+            [1, 2, 2, 3],
+            [2, 3, 4, 4],
+            mode="disk",
+            disk_strategy="hash_partition",
+            partition_count=2,
+            include_common=True,
+            include_duplicates=True,
+            result_mode="file",
+            output=str(output),
+            temp_dir=TEMP_DIR,
+            chunk_size=1,
+        )
+        rows = _read_jsonl(output)
+    finally:
+        output.unlink(missing_ok=True)
+
+    assert result.only_in_first == []
+    assert result.only_in_second == []
+    assert result.common is None
+    assert result.duplicates_first is None
+    assert result.stats.only_in_first_count == 1
+    assert result.stats.only_in_second_count == 1
+    assert result.stats.common_count == 2
+    assert result.stats.duplicate_first_count == 1
+    assert result.stats.duplicate_second_count == 1
+    assert {"section": "only_in_first", "value": 1} in rows
+    assert {"section": "only_in_second", "value": 4} in rows
+    assert {"section": "common", "value": 2} in rows
+    assert {"section": "duplicates_first", "value": 2} in rows
+    assert {"section": "duplicates_second", "value": 4} in rows
+
+
+def test_external_sort_file_result_mode_streams_sections():
+    output = FIXTURES / "result-mode-external-sort-stream.jsonl"
+    output.unlink(missing_ok=True)
+    try:
+        result = compare(
+            [1, 2, 2, 3],
+            [2, 3, 4, 4],
+            mode="disk",
+            disk_strategy="external_sort",
+            include_common=True,
+            include_duplicates=True,
+            result_mode="file",
+            output=str(output),
+            temp_dir=TEMP_DIR,
+            chunk_size=1,
+        )
+        rows = _read_jsonl(output)
+    finally:
+        output.unlink(missing_ok=True)
+
+    assert result.only_in_first == []
+    assert result.only_in_second == []
+    assert result.common is None
+    assert result.duplicates_first is None
+    assert result.stats.only_in_first_count == 1
+    assert result.stats.only_in_second_count == 1
+    assert result.stats.common_count == 2
+    assert result.stats.duplicate_first_count == 1
+    assert result.stats.duplicate_second_count == 1
+    assert {"section": "only_in_first", "value": 1} in rows
+    assert {"section": "only_in_second", "value": 4} in rows
+    assert {"section": "common", "value": 2} in rows
+    assert {"section": "duplicates_first", "value": 2} in rows
+    assert {"section": "duplicates_second", "value": 4} in rows
+
+
 def test_file_result_mode_writes_csv():
     output = FIXTURES / "result-mode.csv"
     output.unlink(missing_ok=True)

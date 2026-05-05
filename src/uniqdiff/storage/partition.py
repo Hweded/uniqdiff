@@ -60,6 +60,20 @@ def compare_partitions(
             all_paths=[*paths.first, *paths.second],
         )
 
+        if result_mode == "file":
+            return _write_file_result_from_partitions(
+                paths,
+                output=output,
+                include_common=include_common,
+                include_duplicates=include_duplicates,
+                first_count=first_count,
+                second_count=second_count,
+                mode=mode,
+                strategy=strategy,
+                metadata=metadata,
+                partition_count=partition_count,
+            )
+
         only_first_rows: list[tuple[int, Any]] = []
         only_second_rows: list[tuple[int, Any]] = []
         common_rows: list[tuple[int, Any]] = []
@@ -107,18 +121,6 @@ def compare_partitions(
         duplicates_second = (
             _values_by_ordinal(duplicates_second_rows) if include_duplicates else None
         )
-        if result_mode == "file":
-            if output is None:
-                raise TempStorageError("result_mode='file' requires output")
-            _write_result_file(
-                output,
-                only_in_first=only_in_first,
-                only_in_second=only_in_second,
-                common=common,
-                duplicates_first=duplicates_first,
-                duplicates_second=duplicates_second,
-            )
-
         stats = CompareStats(
             first_count=first_count,
             second_count=second_count,
@@ -217,6 +219,90 @@ def _make_temp_path(temp_dir: Optional[str], side: str) -> Path:
     return Path(name)
 
 
+def _write_file_result_from_partitions(
+    paths: _PartitionPaths,
+    *,
+    output: Optional[str],
+    include_common: bool,
+    include_duplicates: bool,
+    first_count: int,
+    second_count: int,
+    mode: str,
+    strategy: str,
+    metadata: dict[str, Any],
+    partition_count: int,
+) -> CompareResult:
+    if output is None:
+        raise TempStorageError("result_mode='file' requires output")
+
+    unique_first_count = 0
+    unique_second_count = 0
+    only_in_first_count = 0
+    only_in_second_count = 0
+    common_count = 0
+    duplicate_first_count = 0
+    duplicate_second_count = 0
+
+    with StreamingResultWriter(output) as writer:
+        for left_path, right_path in zip(paths.first, paths.second):
+            left = _read_partition(left_path)
+            right = _read_partition(right_path)
+            unique_first_count += len(left)
+            unique_second_count += len(right)
+
+            left_keys = set(left)
+            right_keys = set(right)
+            common_keys = left_keys & right_keys
+            common_count += len(common_keys)
+
+            for token, rows in left.items():
+                first_row = min(rows, key=lambda row: row[0])
+                if token not in right_keys:
+                    writer.write("only_in_first", _from_blob(first_row[1]))
+                    only_in_first_count += 1
+                elif include_common:
+                    writer.write("common", _from_blob(first_row[1]))
+                if include_duplicates and len(rows) > 1:
+                    for _, payload in sorted(rows)[1:]:
+                        writer.write("duplicates_first", _from_blob(payload))
+                        duplicate_first_count += 1
+
+            for token, rows in right.items():
+                first_row = min(rows, key=lambda row: row[0])
+                if token not in left_keys:
+                    writer.write("only_in_second", _from_blob(first_row[1]))
+                    only_in_second_count += 1
+                if include_duplicates and len(rows) > 1:
+                    for _, payload in sorted(rows)[1:]:
+                        writer.write("duplicates_second", _from_blob(payload))
+                        duplicate_second_count += 1
+
+    return CompareResult(
+        stats=CompareStats(
+            first_count=first_count,
+            second_count=second_count,
+            unique_first_count=unique_first_count,
+            unique_second_count=unique_second_count,
+            only_in_first_count=only_in_first_count,
+            only_in_second_count=only_in_second_count,
+            common_count=common_count,
+            duplicate_first_count=duplicate_first_count,
+            duplicate_second_count=duplicate_second_count,
+            mode=mode,
+            strategy=strategy,
+        ),
+        metadata={
+            **metadata,
+            "backend": "hash_partition",
+            "partition_count": partition_count,
+            "output": output,
+            "result_mode": "file",
+            "partition_files_removed": True,
+        },
+        warnings=_file_mode_warnings("file"),
+    )
+
+
 def _write_partitions(
     items: Iterable[Any],
     paths: list[Path],
@@ -293,31 +379,6 @@ def _from_blob(value: bytes) -> Any:
 
 def _values_by_ordinal(rows: list[tuple[int, Any]]) -> list[Any]:
     return [value for _, value in sorted(rows, key=lambda row: row[0])]
-
-
-def _write_result_file(
-    output: str,
-    *,
-    only_in_first: list[Any],
-    only_in_second: list[Any],
-    common: Optional[list[Any]],
-    duplicates_first: Optional[list[Any]],
-    duplicates_second: Optional[list[Any]],
-) -> None:
-    with StreamingResultWriter(output) as writer:
-        for value in only_in_first:
-            writer.write("only_in_first", value)
-        for value in only_in_second:
-            writer.write("only_in_second", value)
-        if common is not None:
-            for value in common:
-                writer.write("common", value)
-        if duplicates_first is not None:
-            for value in duplicates_first:
-                writer.write("duplicates_first", value)
-        if duplicates_second is not None:
-            for value in duplicates_second:
-                writer.write("duplicates_second", value)
 
 
 def _file_mode_warnings(result_mode: str) -> list[str]:

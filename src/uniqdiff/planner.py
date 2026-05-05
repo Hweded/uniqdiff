@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Sized
+from collections.abc import Iterable, Sized
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 from uniqdiff._utils import ensure_mode, parse_size
 from uniqdiff.exceptions import InvalidInputError
 from uniqdiff.output import ensure_result_mode
-from uniqdiff.result import CompareResult
 from uniqdiff.storage import compare_external_sort, compare_partitions, compare_sqlite
+from uniqdiff.storage.protocols import CompareBackend
 
 _AUTO_BYTES_PER_ITEM = 512
 _AUTO_MEMORY_SAFETY_FACTOR = 0.70
@@ -151,14 +151,14 @@ def ensure_disk_strategy(disk_strategy: str) -> str:
     return normalized
 
 
-def disk_compare_backend(disk_strategy: str) -> Callable[..., CompareResult]:
+def disk_compare_backend(disk_strategy: str) -> CompareBackend:
     """Return the backend function for a normalized disk strategy."""
 
     if disk_strategy == "hash_partition":
-        return compare_partitions
+        return cast(CompareBackend, compare_partitions)
     if disk_strategy == "external_sort":
-        return compare_external_sort
-    return compare_sqlite
+        return cast(CompareBackend, compare_external_sort)
+    return cast(CompareBackend, compare_sqlite)
 
 
 def auto_decision_for_sources(

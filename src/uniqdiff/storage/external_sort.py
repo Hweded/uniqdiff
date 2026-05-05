@@ -63,23 +63,30 @@ def compare_external_sort(
         left_groups = _group_sorted_records(_merge_chunks(left_chunks))
         right_groups = _group_sorted_records(_merge_chunks(right_chunks))
 
+        if result_mode == "file":
+            if output is None:
+                raise TempStorageError("result_mode='file' requires output")
+            return _merge_grouped_to_file(
+                left_groups,
+                right_groups,
+                output=output,
+                include_common=include_common,
+                include_duplicates=include_duplicates,
+                first_count=first_count,
+                second_count=second_count,
+                mode=mode,
+                strategy=strategy,
+                metadata=metadata,
+                left_chunk_count=len(left_chunks),
+                right_chunk_count=len(right_chunks),
+            )
+
         merge_result = _merge_grouped(
             left_groups,
             right_groups,
             include_common=include_common,
             include_duplicates=include_duplicates,
         )
-        if result_mode == "file":
-            if output is None:
-                raise TempStorageError("result_mode='file' requires output")
-            _write_result_file(
-                output,
-                only_in_first=merge_result.only_in_first,
-                only_in_second=merge_result.only_in_second,
-                common=merge_result.common,
-                duplicates_first=merge_result.duplicates_first,
-                duplicates_second=merge_result.duplicates_second,
-            )
 
         stats = CompareStats(
             first_count=first_count,
@@ -245,6 +252,114 @@ def _merge_grouped(
     )
 
 
+def _merge_grouped_to_file(
+    left: Iterator[GroupedRecord],
+    right: Iterator[GroupedRecord],
+    *,
+    output: str,
+    include_common: bool,
+    include_duplicates: bool,
+    first_count: int,
+    second_count: int,
+    mode: str,
+    strategy: str,
+    metadata: dict[str, Any],
+    left_chunk_count: int,
+    right_chunk_count: int,
+) -> CompareResult:
+    unique_first_count = 0
+    unique_second_count = 0
+    only_in_first_count = 0
+    only_in_second_count = 0
+    common_count = 0
+    duplicate_first_count = 0
+    duplicate_second_count = 0
+
+    with StreamingResultWriter(output) as writer:
+        left_item = next(left, None)
+        right_item = next(right, None)
+        while left_item is not None or right_item is not None:
+            if right_item is None or (left_item is not None and left_item[0] < right_item[0]):
+                if left_item is None:
+                    raise RuntimeError("External sort merge reached an invalid left state")
+                _, rows = left_item
+                unique_first_count += 1
+                only_in_first_count += 1
+                writer.write("only_in_first", _first_payload(rows)[1])
+                if include_duplicates:
+                    duplicates = _duplicate_payloads(rows)
+                    duplicate_first_count += len(duplicates)
+                    for _, value in duplicates:
+                        writer.write("duplicates_first", value)
+                left_item = next(left, None)
+                continue
+
+            if left_item is None or right_item[0] < left_item[0]:
+                _, rows = right_item
+                unique_second_count += 1
+                only_in_second_count += 1
+                writer.write("only_in_second", _first_payload(rows)[1])
+                if include_duplicates:
+                    duplicates = _duplicate_payloads(rows)
+                    duplicate_second_count += len(duplicates)
+                    for _, value in duplicates:
+                        writer.write("duplicates_second", value)
+                right_item = next(right, None)
+                continue
+
+            _, left_rows = left_item
+            _, right_rows = right_item
+            unique_first_count += 1
+            unique_second_count += 1
+            common_count += 1
+            if include_common:
+                writer.write("common", _first_payload(left_rows)[1])
+            if include_duplicates:
+                left_duplicates = _duplicate_payloads(left_rows)
+                right_duplicates = _duplicate_payloads(right_rows)
+                duplicate_first_count += len(left_duplicates)
+                duplicate_second_count += len(right_duplicates)
+                for _, value in left_duplicates:
+                    writer.write("duplicates_first", value)
+                for _, value in right_duplicates:
+                    writer.write("duplicates_second", value)
+            left_item = next(left, None)
+            right_item = next(right, None)
+
+    stats = CompareStats(
+        first_count=first_count,
+        second_count=second_count,
+        unique_first_count=unique_first_count,
+        unique_second_count=unique_second_count,
+        only_in_first_count=only_in_first_count,
+        only_in_second_count=only_in_second_count,
+        common_count=common_count,
+        duplicate_first_count=duplicate_first_count,
+        duplicate_second_count=duplicate_second_count,
+        mode=mode,
+        strategy=strategy,
+    )
+    return CompareResult(
+        only_in_first=[],
+        only_in_second=[],
+        common=None,
+        unique=[],
+        duplicates_first=None,
+        duplicates_second=None,
+        stats=stats,
+        metadata={
+            **metadata,
+            "backend": "external_sort",
+            "output": output,
+            "result_mode": "file",
+            "sorted_chunks_removed": True,
+            "left_chunk_count": left_chunk_count,
+            "right_chunk_count": right_chunk_count,
+        },
+        warnings=_file_mode_warnings("file"),
+    )
+
+
 def _write_sorted_chunks(
     items: Iterable[Any],
     *,
@@ -363,31 +478,6 @@ def _from_blob(value: bytes) -> Any:
 
 def _values_by_ordinal(rows: list[tuple[int, Any]]) -> list[Any]:
     return [value for _, value in sorted(rows, key=lambda row: row[0])]
-
-
-def _write_result_file(
-    output: str,
-    *,
-    only_in_first: list[Any],
-    only_in_second: list[Any],
-    common: Optional[list[Any]],
-    duplicates_first: Optional[list[Any]],
-    duplicates_second: Optional[list[Any]],
-) -> None:
-    with StreamingResultWriter(output) as writer:
-        for value in only_in_first:
-            writer.write("only_in_first", value)
-        for value in only_in_second:
-            writer.write("only_in_second", value)
-        if common is not None:
-            for value in common:
-                writer.write("common", value)
-        if duplicates_first is not None:
-            for value in duplicates_first:
-                writer.write("duplicates_first", value)
-        if duplicates_second is not None:
-            for value in duplicates_second:
-                writer.write("duplicates_second", value)
 
 
 def _file_mode_warnings(result_mode: str) -> list[str]:
