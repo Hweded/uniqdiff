@@ -113,6 +113,28 @@ Each yielded row contains `section` and `value`.
 Lazily reads only values from a `.jsonl` or `.csv` result file. Use `sections` to
 filter result sections such as `only_in_first` or `only_in_second`.
 
+## `iter_sorted_diff(first, second, ...)`
+
+Streams exact diff rows for inputs that are already sorted by comparison token.
+
+Important parameters:
+
+- `key`: string, tuple/list of strings, callable, or `None`;
+- `normalizer`: callable applied after key extraction;
+- `include_common`: emit `common` rows;
+- `include_duplicates`: emit `duplicates_first` and `duplicates_second` rows;
+- `validate_sorted`: validate non-descending token order while reading.
+
+Each yielded row uses the file-result row schema:
+
+```python
+{"section": "only_in_first", "value": item}
+```
+
+This helper does not create temporary files and does not build a full in-memory
+index. It keeps only the current equal-token group from each input in memory. It
+requires both inputs to be sorted by the same `key` and `normalizer`.
+
 ## `CompareResult.iter_unique()`
 
 Yields unique differences. For file-backed results, reads values lazily from the

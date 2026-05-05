@@ -46,6 +46,7 @@ from uniqdiff.fuzzy import compare_fuzzy_strings
 from uniqdiff.normalizers import compose_normalizers, string_normalizer
 from uniqdiff.output import iter_result_rows, iter_result_values
 from uniqdiff.result import CompareResult, CompareStats
+from uniqdiff.streaming import iter_sorted_diff
 
 __all__ = [
     "ComparatorError",
@@ -88,6 +89,7 @@ __all__ = [
     "intersection",
     "iter_result_rows",
     "iter_result_values",
+    "iter_sorted_diff",
     "list_connectors",
     "probabilistic_diff_candidates",
     "register_connector",

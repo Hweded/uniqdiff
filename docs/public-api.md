@@ -28,6 +28,7 @@ The following names are part of the 1.0 engine contract:
 - `CompareStats`;
 - `iter_result_rows`;
 - `iter_result_values`;
+- `iter_sorted_diff`;
 - connector protocol and registry helpers;
 - built-in local connectors;
 - documented exception classes.

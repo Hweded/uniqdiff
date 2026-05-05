@@ -18,6 +18,7 @@ This directory contains project documentation for users and maintainers.
 - [Hash Partitioning](hash-partitioning.md)
 - [External Sort](external-sort.md)
 - [File Result Mode](file-result-mode.md)
+- [Streaming Diff](streaming-diff.md)
 - [Result Schema](result-schema.md)
 - [Auto Mode](auto-mode.md)
 - [Performance](performance.md)

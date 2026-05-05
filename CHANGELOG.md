@@ -7,6 +7,8 @@
 - Added `disk_strategy="auto"` so the planner can choose between SQLite, hash
   partitioning, and external sort for disk-backed workloads.
 - Documented the smarter auto-mode heuristic and auto disk strategy selection.
+- Added `iter_sorted_diff()` for exact streaming comparison of already sorted
+  inputs without temporary files.
 
 ## 1.0.0
 
