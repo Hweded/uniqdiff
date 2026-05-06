@@ -77,6 +77,34 @@ be read with `iter_result_rows()` or `iter_result_values()`.
 
 `write_sorted_diff()` is the lower-level helper with the same behavior.
 
+## Sorted Field Diff
+
+Use `iter_field_diff_sorted()` to stream changed fields for matching-key rows
+without indexing the second input:
+
+```python
+from uniqdiff import iter_field_diff_sorted
+
+rows = iter_field_diff_sorted(
+    old_rows,
+    new_rows,
+    key="id",
+    columns=("price", "status"),
+)
+
+for row in rows:
+    print(row)
+```
+
+Each yielded row has:
+
+```python
+{"key": "123", "changes": [{"field": "price", "left": 10, "right": 12}]}
+```
+
+Both inputs must be sorted by the same key. With `validate_sorted=True`, the helper
+raises `InvalidInputError` if it sees keys out of order.
+
 ## Requirements
 
 Both inputs must be sorted by the same token produced from `key` and

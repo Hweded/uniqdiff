@@ -13,6 +13,7 @@ from uniqdiff.disk import atomic_write_result
 from uniqdiff.fields import FieldDiffResult
 from uniqdiff.fields import compare_fields as _compare_fields
 from uniqdiff.fields import compare_fields_files as _compare_fields_files
+from uniqdiff.fields import iter_field_diff_sorted as _iter_field_diff_sorted
 from uniqdiff.output import compare_result_events
 from uniqdiff.planner import build_duplicates_plan, build_execution_plan, disk_compare_backend
 from uniqdiff.result import CompareResult, CompareStats
@@ -241,6 +242,18 @@ def compare_fields(
     """Compare changed fields for keyed structured rows."""
 
     return _compare_fields(first, second, key=key, **kwargs)
+
+
+def iter_field_diff_sorted(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec,
+    **kwargs: Any,
+) -> Iterator[dict[str, Any]]:
+    """Stream field-level diff rows for inputs already sorted by key."""
+
+    return _iter_field_diff_sorted(first, second, key=key, **kwargs)
 
 
 def compare_fields_files(

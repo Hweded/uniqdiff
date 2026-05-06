@@ -1,7 +1,15 @@
 import json
 from pathlib import Path
 
-from uniqdiff import compare_fields, compare_fields_files, iter_field_diff_rows
+import pytest
+
+from uniqdiff import (
+    InvalidInputError,
+    compare_fields,
+    compare_fields_files,
+    iter_field_diff_rows,
+    iter_field_diff_sorted,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -144,3 +152,49 @@ def test_compare_fields_reports_duplicate_keys_in_second_input():
     assert result.warnings == [
         "Duplicate keys were found in the second input; only the first row per key was used."
     ]
+
+
+def test_iter_field_diff_sorted_streams_changes_without_indexing():
+    rows = iter_field_diff_sorted(
+        [
+            {"id": 1, "name": "Ann", "city": "Paris"},
+            {"id": 2, "name": "Bob", "city": "Berlin"},
+            {"id": 4, "name": "Dana", "city": "Rome"},
+        ],
+        [
+            {"id": 1, "name": "Anne", "city": "Paris"},
+            {"id": 3, "name": "Cara", "city": "Paris"},
+            {"id": 4, "name": "Dana", "city": "Milan"},
+        ],
+        key="id",
+    )
+
+    assert list(rows) == [
+        {"key": 1, "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]},
+        {"key": 4, "changes": [{"field": "city", "left": "Rome", "right": "Milan"}]},
+    ]
+
+
+def test_iter_field_diff_sorted_respects_columns_and_exclusions():
+    rows = iter_field_diff_sorted(
+        [{"id": 1, "name": "Ann", "city": "Paris"}],
+        [{"id": 1, "name": "Anne", "city": "Rome"}],
+        key="id",
+        columns=("name", "city"),
+        exclude_columns=("city",),
+    )
+
+    assert list(rows) == [
+        {"key": 1, "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]}
+    ]
+
+
+def test_iter_field_diff_sorted_validates_key_order():
+    rows = iter_field_diff_sorted(
+        [{"id": 2, "name": "Bob"}, {"id": 1, "name": "Ann"}],
+        [{"id": 1, "name": "Anne"}],
+        key="id",
+    )
+
+    with pytest.raises(InvalidInputError, match="not sorted by key"):
+        list(rows)

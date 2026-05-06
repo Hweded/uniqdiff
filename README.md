@@ -328,11 +328,13 @@ from uniqdiff import (
     compare_files,
     iter_compare_events,
     iter_event_rows,
+    iter_field_diff_sorted,
     summarize_event_file,
 )
 
 rows = compare_files("old.csv", "new.csv", format="csv", key="id")
 fields = compare_fields(old_rows, new_rows, key="id", columns=("status",))
+streamed_fields = iter_field_diff_sorted(old_rows_sorted, new_rows_sorted, key="id")
 schema = compare_file_schema("old.csv", "new.csv", format="csv")
 events = iter_compare_events(old_rows, new_rows, key="id")
 saved_events = iter_event_rows("diff.jsonl")

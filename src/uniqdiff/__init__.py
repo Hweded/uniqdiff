@@ -36,6 +36,7 @@ from uniqdiff.core import (
     infer_schema,
     intersection,
     iter_compare_events,
+    iter_field_diff_sorted,
     unique,
     write_sorted_diff_file,
 )
@@ -121,6 +122,7 @@ __all__ = [
     "intersection",
     "iter_compare_events",
     "iter_event_rows",
+    "iter_field_diff_sorted",
     "iter_result_rows",
     "iter_result_values",
     "iter_field_diff_rows",

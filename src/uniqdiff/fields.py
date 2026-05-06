@@ -162,6 +162,56 @@ def compare_fields(
     )
 
 
+def iter_field_diff_sorted(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec,
+    columns: Optional[Sequence[str]] = None,
+    exclude_columns: Optional[Sequence[str]] = None,
+    normalizer: Optional[Normalizer] = None,
+    validate_sorted: bool = True,
+) -> Iterator[dict[str, Any]]:
+    """Yield field-diff rows for inputs sorted by comparison key.
+
+    This streaming helper keeps only the current equal-key group from each input in
+    memory. It is intended for large inputs that can be pre-sorted by the same key
+    and normalization rules.
+    """
+
+    config = _build_config(
+        key=key,
+        columns=columns,
+        exclude_columns=exclude_columns,
+        normalizer=normalizer,
+        max_rows=None,
+        max_bytes=None,
+    )
+    left_groups = _iter_key_groups(first, key=key, validate_sorted=validate_sorted)
+    right_groups = _iter_key_groups(second, key=key, validate_sorted=validate_sorted)
+    left_item = next(left_groups, None)
+    right_item = next(right_groups, None)
+
+    while left_item is not None and right_item is not None:
+        left_key, left_rows = left_item
+        right_key, right_rows = right_item
+        if left_key < right_key:
+            left_item = next(left_groups, None)
+            continue
+        if right_key < left_key:
+            right_item = next(right_groups, None)
+            continue
+
+        changed = _changed_fields(left_rows[0], right_rows[0], config=config)
+        if changed:
+            yield {
+                "key": left_key,
+                "changes": [change.to_dict() for change in changed],
+            }
+        left_item = next(left_groups, None)
+        right_item = next(right_groups, None)
+
+
 def iter_field_diff_rows(output: Union[str, os.PathLike[str]]) -> Iterator[dict[str, Any]]:
     """Yield field-diff rows lazily from a JSONL field diff output file."""
 
@@ -436,6 +486,35 @@ def _metadata_key(key: KeySpec) -> Any:
     if callable(key):
         return getattr(key, "__name__", repr(key))
     return key
+
+
+def _iter_key_groups(
+    rows: Iterable[Any],
+    *,
+    key: KeySpec,
+    validate_sorted: bool,
+) -> Iterator[tuple[Any, list[Any]]]:
+    previous_token: Any = None
+    current_token: Any = None
+    current_rows: list[Any] = []
+    has_previous = False
+
+    for row in rows:
+        token = extract_key(row, key)
+        if validate_sorted and has_previous and token < previous_token:
+            raise InvalidInputError("sorted field diff input is not sorted by key")
+        previous_token = token
+        has_previous = True
+        if current_token is None:
+            current_token = token
+        if token != current_token:
+            yield current_token, current_rows
+            current_token = token
+            current_rows = []
+        current_rows.append(row)
+
+    if current_token is not None:
+        yield current_token, current_rows
 
 
 class _JSONLFieldWriter:

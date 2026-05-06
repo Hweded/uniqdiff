@@ -77,6 +77,28 @@ Streaming JSONL rows use this shape:
 {"key": row_key, "changes": [{"field": "status", "left": "old", "right": "new"}]}
 ```
 
+## `iter_field_diff_sorted(first, second, key=...)`
+
+Streams field-level diff rows for inputs already sorted by the same key.
+
+Important parameters:
+
+- `key`: required row key;
+- `columns`: optional fields to compare;
+- `exclude_columns`: fields to ignore;
+- `normalizer`: optional value normalizer before comparison;
+- `validate_sorted`: validates non-descending key order while reading.
+
+This helper keeps only the current equal-key group from each input in memory. It is
+the low-memory alternative to `compare_fields()` when upstream systems can provide
+sorted inputs.
+
+Each yielded row has:
+
+```python
+{"key": row_key, "changes": [{"field": "status", "left": "old", "right": "new"}]}
+```
+
 ## `compare_fields_files(file_a, file_b, key=...)`
 
 Reads supported files and runs `compare_fields()`. CSV, TSV, JSONL, TXT, and
