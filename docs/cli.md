@@ -24,6 +24,7 @@ Commands:
 Input flags:
 
 - `--format auto|csv|tsv|jsonl|parquet|txt`;
+- `--input-format auto|csv|tsv|jsonl|parquet|txt` when `--format` is used for output;
 - `--encoding utf-8`;
 - `--key id` or `--key id,tenant`;
 - `--delimiter ","`;
@@ -58,6 +59,8 @@ Backend flags:
 
 Output and behavior flags:
 
+- `--format jsonl` for the `uniqdiff.jsonl` machine-readable event stream in
+  `compare` and `diff`;
 - `--result-mode memory|file` for `compare`, `diff`, and `intersection`;
 - `--output path.json|path.jsonl|path.csv` for `compare`, `diff`, and `intersection`;
 - `--include-duplicates` for comparison commands;
@@ -118,7 +121,29 @@ Exit codes:
 
 ## Large Outputs
 
-For large outputs, write rows directly to JSONL or CSV:
+The primary machine-readable output is the `uniqdiff.jsonl` event stream:
+
+```bash
+uniqdiff compare old.csv new.csv \
+  --key id \
+  --format jsonl \
+  --output diff.jsonl
+```
+
+Each line is one JSON object. The first event is `metadata`, the last event is
+`summary`, and every event has a required `type` field.
+
+If input extensions are ambiguous, set the input format separately:
+
+```bash
+uniqdiff compare old_snapshot new_snapshot \
+  --input-format csv \
+  --key id \
+  --format jsonl
+```
+
+The older `result_mode="file"` contract remains available when you need raw
+`section`/`value` rows:
 
 ```bash
 uniqdiff compare old.csv new.csv \
@@ -170,6 +195,17 @@ uniqdiff diff old.csv new.csv \
 `--summary` returns counters and `summary_by_column`, which is useful in CI/CD
 when the full changed-row output is too large.
 
+Field diff can also be emitted as `uniqdiff.jsonl` events:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --key id \
+  --field-diff \
+  --columns name,status \
+  --format jsonl \
+  --output changed-events.jsonl
+```
+
 Field-diff CLI constraints:
 
 - `--field-diff` requires `--key`;
@@ -205,7 +241,8 @@ files, use `--schema-sample-size` to inspect only the first N rows per input.
 Schema-diff CLI constraints:
 
 - `--schema-diff` cannot be combined with `--field-diff`;
-- `--schema-diff --output` supports only `.json`;
+- `--schema-diff --output` supports only `.json` unless `--format jsonl` is used
+  for event output;
 - `--result-mode` is not used with `--schema-diff`.
 
 ## Fixture Smoke Examples
@@ -219,6 +256,7 @@ uniqdiff compare tests/fixtures/left.tsv tests/fixtures/right.tsv --format tsv -
 uniqdiff diff tests/fixtures/left.txt tests/fixtures/right.txt --format txt --output diff.json
 uniqdiff diff tests/fixtures/left.csv tests/fixtures/right.csv --format csv --key id --field-diff --columns name --summary
 uniqdiff diff tests/fixtures/left.csv tests/fixtures/right.csv --format csv --schema-diff --summary
+uniqdiff compare tests/fixtures/left.csv tests/fixtures/right.csv --key id --format jsonl
 uniqdiff intersection tests/fixtures/left.jsonl tests/fixtures/right.jsonl --format jsonl --key id
 uniqdiff duplicates tests/fixtures/dupes.txt --format txt --summary --fail-on-diff
 ```

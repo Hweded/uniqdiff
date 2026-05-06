@@ -1,4 +1,4 @@
-"""Streaming result output helpers."""
+"""Legacy section/value result output helpers."""
 
 from __future__ import annotations
 

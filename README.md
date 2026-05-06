@@ -112,7 +112,27 @@ Field-level diff:
 }
 ```
 
-Streaming JSONL output for large diffs:
+Machine-readable JSONL event stream:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --key id \
+  --field-diff \
+  --columns status \
+  --format jsonl \
+  --output diff.jsonl
+```
+
+Example `uniqdiff.jsonl` events:
+
+```jsonl
+{"type":"metadata","format":"uniqdiff.jsonl","format_version":"1.0","tool":"uniqdiff","tool_version":"1.0.0","mode":"field_diff","key_columns":["id"],"compared_columns":["status"],"created_at":"2026-05-06T12:00:00Z"}
+{"type":"only_left","key":{"id":"1"}}
+{"type":"field_change","key":{"id":"2"},"column":"status","left":"pending","right":"active"}
+{"type":"summary","left_rows":3,"right_rows":3,"common_rows":2,"only_left":1,"only_right":1,"changed_rows":1,"changed_fields":1,"duplicate_keys_left":0,"duplicate_keys_right":0,"schema_changes":0}
+```
+
+Legacy `section`/`value` file-result output:
 
 ```bash
 uniqdiff diff old.csv new.csv \
@@ -138,6 +158,7 @@ Example JSONL rows:
 - Catch row-level changes before loading data downstream.
 - Detect schema drift in CI.
 - Stream large diff outputs to JSONL for later processing.
+- Load diff events into DuckDB, Spark, BigQuery, ClickHouse, or CI jobs.
 - Validate backend service exports against expected data.
 - Build data QA tools on top of a stable comparison engine.
 
@@ -159,7 +180,7 @@ Result:
 
 ```text
 ruff: All checks passed
-mypy: Success, no issues found in 32 source files
+mypy: Success, no issues found in 35 source files
 pytest: full test suite passed, 2 optional tests skipped
 ```
 
@@ -236,6 +257,7 @@ csv-diff/csvdiff-style workflows, DataComPy, and `uniqdiff`.
 - Streaming sorted diff for already sorted inputs.
 - Memory, SQLite, hash partition, external sort, and auto modes.
 - File-result mode for JSONL/CSV output.
+- `uniqdiff.jsonl` event stream with schema version `1.0`.
 - Lazy readers for large result files.
 - CLI with `--summary` and `--fail-on-diff`.
 - Type hints and stable result objects.
@@ -283,22 +305,46 @@ Large output:
 
 ```bash
 uniqdiff diff old.csv new.csv \
-  --format csv \
   --key id \
-  --mode disk \
-  --result-mode file \
+  --format jsonl \
   --output diff.jsonl
+```
+
+Use `--input-format csv` when file extensions are not enough for input detection:
+
+```bash
+uniqdiff diff snapshot_a snapshot_b \
+  --input-format csv \
+  --key id \
+  --format jsonl
 ```
 
 Python API:
 
 ```python
-from uniqdiff import compare_files, compare_fields, compare_file_schema
+from uniqdiff import compare_files, compare_fields, compare_file_schema, iter_compare_events
 
 rows = compare_files("old.csv", "new.csv", format="csv", key="id")
 fields = compare_fields(old_rows, new_rows, key="id", columns=("status",))
 schema = compare_file_schema("old.csv", "new.csv", format="csv")
+events = iter_compare_events(old_rows, new_rows, key="id")
 ```
+
+JSONL event types:
+
+| Type | Meaning |
+|---|---|
+| `metadata` | First event; format, version, key columns, compared columns, timestamp |
+| `only_left` | Key exists only in the left input |
+| `only_right` | Key exists only in the right input |
+| `row_changed` | Matching-key row has one or more changed fields |
+| `field_change` | One changed field with left/right values |
+| `duplicate_key` | Duplicate key detected on one side |
+| `schema_change` | Added/removed/type/nullable schema change |
+| `error` | Machine-readable error event for integrations |
+| `summary` | Last event; counts and metrics |
+
+The event stream format name is `uniqdiff.jsonl`; the schema version is `1.0`.
 
 Parquet:
 

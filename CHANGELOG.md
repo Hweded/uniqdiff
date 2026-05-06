@@ -29,6 +29,11 @@
   through `strict_numeric_types=False` / `--loose-numeric-types`.
 - Added stricter CLI validation for field/schema diff mode combinations and
   output formats.
+- Refactored `uniqdiff.output` into a package and added the versioned
+  `uniqdiff.jsonl` event stream format with metadata, diff, field/schema change,
+  duplicate-key, error, and summary events.
+- Added `iter_compare_events()` and CLI `--format jsonl` event output for
+  machine-readable streaming workflows.
 
 ## 1.0.0
 

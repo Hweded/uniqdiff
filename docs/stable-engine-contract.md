@@ -77,11 +77,16 @@ Stable fields:
 
 - `iter_result_rows`;
 - `iter_result_values`;
+- `iter_compare_events`;
 - `CompareResult.iter_unique`;
 - `CompareResult.iter_section`.
 
 These APIs allow large result files to be consumed without loading them fully into
 memory.
+
+`iter_compare_events()` yields the versioned `uniqdiff.jsonl` event stream for
+machine-readable integrations. The stream starts with `metadata`, ends with
+`summary`, and emits one event object at a time.
 
 ### Connector Protocol
 
@@ -141,12 +146,17 @@ Stable result modes:
 
 `result_mode="file"` is the engine-level path for large diff output.
 
+The `uniqdiff.jsonl` event stream is the preferred machine-readable interchange
+format for CI/CD, ETL, and analytical loading workflows. The older file-result
+schema remains supported for compatibility with existing `section`/`value` readers.
+
 ### 1.1-Pre Engine Additions
 
 The current 1.x development branch also exposes documented engine primitives for:
 
 - sorted streaming diff through `iter_sorted_diff()`, `compare_sorted_iter()`,
   `write_sorted_diff()`, and `write_sorted_diff_file()`;
+- JSONL event streaming through `iter_compare_events()` and CLI `--format jsonl`;
 - field-level diff by key through `compare_fields()`, `compare_fields_files()`,
   `compare_file_fields()`, and `iter_field_diff_rows()`;
 - schema-aware diff through `infer_schema()`, `compare_schema()`, and
@@ -215,6 +225,7 @@ The current codebase already includes:
 - file result mode;
 - lazy result readers;
 - sorted streaming diff;
+- JSONL event stream output;
 - field-level diff by key;
 - schema-aware diff;
 - connector registry;

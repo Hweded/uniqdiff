@@ -246,6 +246,169 @@ def test_cli_field_diff_writes_jsonl_and_summary(capsys):
     assert rows == [{"key": "1", "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]}]
 
 
+def test_cli_compare_writes_uniqdiff_jsonl_events_to_stdout(capsys):
+    exit_code = main(
+        [
+            "compare",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--key",
+            "id",
+            "--format",
+            "jsonl",
+        ]
+    )
+
+    rows = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+
+    assert exit_code == 0
+    assert rows[0]["type"] == "metadata"
+    assert rows[0]["format"] == "uniqdiff.jsonl"
+    assert rows[0]["format_version"] == "1.0"
+    assert rows[-1]["type"] == "summary"
+    assert {"type": "only_left", "key": {"id": "1"}} in rows
+    assert {"type": "only_right", "key": {"id": "3"}} in rows
+
+
+def test_cli_compare_writes_uniqdiff_jsonl_events_to_file():
+    output = FIXTURES / "cli-events.jsonl"
+    output.unlink(missing_ok=True)
+
+    try:
+        exit_code = main(
+            [
+                "compare",
+                str(FIXTURES / "left.csv"),
+                str(FIXTURES / "right.csv"),
+                "--key",
+                "id",
+                "--format",
+                "jsonl",
+                "--output",
+                str(output),
+            ]
+        )
+        rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    finally:
+        output.unlink(missing_ok=True)
+
+    assert exit_code == 0
+    assert rows[0]["type"] == "metadata"
+    assert rows[-1]["type"] == "summary"
+    assert rows[-1]["only_left"] == 1
+    assert rows[-1]["only_right"] == 1
+
+
+def test_cli_compare_jsonl_events_can_use_disk_mode():
+    output = FIXTURES / "cli-events-disk.jsonl"
+    output.unlink(missing_ok=True)
+
+    try:
+        exit_code = main(
+            [
+                "compare",
+                str(FIXTURES / "left.csv"),
+                str(FIXTURES / "right.csv"),
+                "--key",
+                "id",
+                "--format",
+                "jsonl",
+                "--mode",
+                "disk",
+                "--output",
+                str(output),
+            ]
+        )
+        rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    finally:
+        output.unlink(missing_ok=True)
+
+    assert exit_code == 0
+    assert rows[0]["type"] == "metadata"
+    assert rows[-1]["type"] == "summary"
+    assert {"type": "only_left", "key": {"id": "1"}} in rows
+    assert {"type": "only_right", "key": {"id": "3"}} in rows
+
+
+def test_cli_field_diff_jsonl_events_include_changed_fields(capsys):
+    left = FIXTURES / "cli-event-field-left.csv"
+    right = FIXTURES / "cli-event-field-right.csv"
+    left.write_text("id,name,status\n1,Ann,old\n2,Bob,stable\n", encoding="utf-8")
+    right.write_text("id,name,status\n1,Ann,new\n3,Cara,stable\n", encoding="utf-8")
+
+    try:
+        exit_code = main(
+            [
+                "diff",
+                str(left),
+                str(right),
+                "--key",
+                "id",
+                "--format",
+                "jsonl",
+                "--field-diff",
+                "--columns",
+                "status",
+            ]
+        )
+        rows = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    finally:
+        left.unlink(missing_ok=True)
+        right.unlink(missing_ok=True)
+
+    assert exit_code == 0
+    assert [row["type"] for row in rows] == [
+        "metadata",
+        "only_left",
+        "only_right",
+        "row_changed",
+        "field_change",
+        "summary",
+    ]
+    assert rows[3] == {"type": "row_changed", "key": {"id": "1"}, "changed_columns": ["status"]}
+    assert rows[4] == {
+        "type": "field_change",
+        "key": {"id": "1"},
+        "column": "status",
+        "left": "old",
+        "right": "new",
+    }
+
+
+def test_cli_schema_diff_jsonl_events_to_file():
+    left = FIXTURES / "cli-event-schema-left.csv"
+    right = FIXTURES / "cli-event-schema-right.csv"
+    output = FIXTURES / "cli-schema-events.jsonl"
+    left.write_text("id,price\n1,10\n", encoding="utf-8")
+    right.write_text("id,price,discount\n1,10.5,yes\n", encoding="utf-8")
+    output.unlink(missing_ok=True)
+
+    try:
+        exit_code = main(
+            [
+                "diff",
+                str(left),
+                str(right),
+                "--schema-diff",
+                "--format",
+                "jsonl",
+                "--output",
+                str(output),
+            ]
+        )
+        rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    finally:
+        left.unlink(missing_ok=True)
+        right.unlink(missing_ok=True)
+        output.unlink(missing_ok=True)
+
+    assert exit_code == 0
+    assert rows[0]["type"] == "metadata"
+    assert {"type": "schema_change", "change": "column_added", "column": "discount"} in rows
+    assert rows[-1]["type"] == "summary"
+    assert rows[-1]["schema_changes"] >= 1
+
+
 def test_cli_fail_on_diff_returns_one_for_differences(capsys):
     exit_code = main(
         [
@@ -615,6 +778,7 @@ def test_cli_docs_cover_documented_flags():
         "--fieldnames",
         "--format",
         "--include-duplicates",
+        "--input-format",
         "--key",
         "--lower",
         "--field-diff",

@@ -51,6 +51,7 @@ This directory contains project documentation for users and maintainers.
 - hash partitioning backend for partition-by-partition processing;
 - external sort backend for sorted chunk and merge processing;
 - file result mode for large result sets;
+- versioned `uniqdiff.jsonl` event stream output;
 - sorted streaming diff for already sorted inputs;
 - field-level diff by key with JSONL streaming output;
 - schema-aware diff for added/removed columns, type changes, and nullable changes;

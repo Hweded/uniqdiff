@@ -13,6 +13,7 @@ from uniqdiff.disk import atomic_write_result
 from uniqdiff.fields import FieldDiffResult
 from uniqdiff.fields import compare_fields as _compare_fields
 from uniqdiff.fields import compare_fields_files as _compare_fields_files
+from uniqdiff.output import compare_result_events
 from uniqdiff.planner import build_duplicates_plan, build_execution_plan, disk_compare_backend
 from uniqdiff.result import CompareResult, CompareStats
 from uniqdiff.schema import SchemaDiffResult, SchemaResult
@@ -274,6 +275,43 @@ def compare_iter(first: Iterable[Any], second: Iterable[Any], **kwargs: Any) -> 
     """Compare generic iterables or generators."""
 
     return compare(first, second, **kwargs)
+
+
+def iter_compare_events(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec = None,
+    normalizer: Optional[Normalizer] = None,
+    mode: str = "memory",
+    include_common: bool = False,
+    include_duplicates: bool = False,
+    compared_columns: Optional[Sequence[str]] = None,
+    **kwargs: Any,
+) -> Iterator[dict[str, Any]]:
+    """Yield a stable `uniqdiff.jsonl` event stream for a comparison.
+
+    The first yielded event is always `metadata` and the last one is always
+    `summary`. The function does not build one large JSON object; consumers can write
+    each yielded event directly to JSONL.
+    """
+
+    result = compare(
+        first,
+        second,
+        key=key,
+        normalizer=normalizer,
+        mode=mode,
+        include_common=include_common,
+        include_duplicates=include_duplicates,
+        **kwargs,
+    )
+    yield from compare_result_events(
+        result,
+        key=key,
+        mode="compare" if include_common else "diff",
+        compared_columns=compared_columns,
+    )
 
 
 def compare_sorted_iter(

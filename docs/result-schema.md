@@ -80,6 +80,46 @@ Stable section names:
 Consumers should ignore result rows for sections they did not request. Changing the
 row field names or the meaning of existing sections is a breaking change.
 
+## JSONL Event Stream
+
+The primary machine-readable stream format is `uniqdiff.jsonl`.
+
+Format contract:
+
+- encoding is UTF-8;
+- one line is one valid JSON object;
+- every object is an event with a required `type` field;
+- the first event is `metadata`;
+- the last event is `summary`;
+- `metadata.format` is `uniqdiff.jsonl`;
+- `metadata.format_version` is `1.0`.
+
+Event types:
+
+| Type | Required fields |
+|---|---|
+| `metadata` | `type`, `format`, `format_version`, `tool`, `tool_version`, `mode`, `key_columns`, `compared_columns`, `created_at` |
+| `only_left` | `type`, `key` |
+| `only_right` | `type`, `key` |
+| `row_changed` | `type`, `key`, `changed_columns` |
+| `field_change` | `type`, `key`, `column`, `left`, `right` |
+| `duplicate_key` | `type`, `side`, `key`, `count` |
+| `schema_change` | `type`, `change`, `column` |
+| `error` | `type`, `code`, `message` |
+| `summary` | `type`, `left_rows`, `right_rows`, `common_rows`, `only_left`, `only_right`, `changed_rows`, `changed_fields`, `duplicate_keys_left`, `duplicate_keys_right`, `schema_changes` |
+
+Example:
+
+```jsonl
+{"type":"metadata","format":"uniqdiff.jsonl","format_version":"1.0","tool":"uniqdiff","tool_version":"1.0.0","mode":"diff","key_columns":["id"],"compared_columns":["price","status"],"created_at":"2026-05-06T12:00:00Z"}
+{"type":"only_left","key":{"id":"1001"}}
+{"type":"field_change","key":{"id":"123"},"column":"price","left":10,"right":12}
+{"type":"summary","left_rows":10000,"right_rows":10000,"common_rows":7000,"only_left":3000,"only_right":3000,"changed_rows":1400,"changed_fields":4200,"duplicate_keys_left":500,"duplicate_keys_right":500,"schema_changes":2}
+```
+
+Event JSONL is intended for streaming pipelines, CI/CD, and loading into analytical
+engines. It should be preferred over one large JSON object for large outputs.
+
 ## Lazy Readers
 
 `iter_result_rows(path, sections=None)` yields dictionaries with `section` and

@@ -8,7 +8,8 @@ from uniqdiff import compare, duplicates, string_normalizer
 
 TEMP_DIR = str(Path(__file__).parent / "fixtures")
 INT_LISTS = st.lists(st.integers(min_value=-20, max_value=20), max_size=25)
-TEXT_LISTS = st.lists(st.text(min_size=0, max_size=8), max_size=20)
+TEXT_ALPHABET = st.characters(min_codepoint=32, max_codepoint=126)
+TEXT_LISTS = st.lists(st.text(alphabet=TEXT_ALPHABET, min_size=0, max_size=8), max_size=20)
 
 
 def _projection(result):

@@ -163,6 +163,23 @@ CSV/TSV options:
 
 Alias for iterable/generator-oriented usage.
 
+## `iter_compare_events(first, second, ...)`
+
+Yields a `uniqdiff.jsonl` event stream as dictionaries. The first yielded event is
+`metadata`; the last yielded event is `summary`.
+
+Important parameters:
+
+- `key`: string, tuple/list of strings, callable, or `None`;
+- `normalizer`: callable applied after key extraction;
+- `mode`: `memory`, `disk`, or `auto`;
+- `include_common`: include common-row counts;
+- `include_duplicates`: emit duplicate-key events when duplicate rows are collected;
+- `compared_columns`: optional metadata for downstream tools.
+
+This API is designed for callers that want to write JSONL incrementally instead of
+building one large output object.
+
 ## `compare_sorted_iter(first, second, ...)`
 
 Streams exact `section`/`value` rows for iterable inputs that are already sorted

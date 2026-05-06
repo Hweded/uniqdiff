@@ -25,6 +25,7 @@ The following names are part of the 1.x engine contract:
 - `compare_files`;
 - `compare_sources`;
 - `duplicates_source`;
+- `iter_compare_events`;
 - `compare_fields`;
 - `compare_fields_files`;
 - `compare_file_fields`;
@@ -53,7 +54,7 @@ These modules may be imported directly when users need a narrower namespace:
 - `uniqdiff.connectors`: connector protocol, built-in connectors, registry helpers;
 - `uniqdiff.exceptions`: documented exception classes;
 - `uniqdiff.normalizers`: built-in normalizer helpers;
-- `uniqdiff.output`: lazy result readers;
+- `uniqdiff.output`: JSONL event writers, event schema helpers, and lazy result readers;
 - `uniqdiff.result`: result dataclasses;
 - `uniqdiff.fields`: field-level diff dataclasses and helpers;
 - `uniqdiff.schema`: schema inference and schema diff dataclasses and helpers;
