@@ -321,6 +321,110 @@ def test_cli_missing_file_returns_short_error(capsys):
     assert "uniqdiff: file not found:" in captured.err
 
 
+def test_cli_field_diff_requires_key(capsys):
+    exit_code = main(
+        [
+            "diff",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--format",
+            "csv",
+            "--field-diff",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert captured.out == ""
+    assert "uniqdiff: --field-diff requires --key" in captured.err
+
+
+def test_cli_schema_and_field_diff_are_mutually_exclusive(capsys):
+    exit_code = main(
+        [
+            "diff",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--format",
+            "csv",
+            "--key",
+            "id",
+            "--field-diff",
+            "--schema-diff",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "--schema-diff cannot be combined with --field-diff" in captured.err
+
+
+def test_cli_field_diff_output_requires_jsonl(capsys):
+    exit_code = main(
+        [
+            "diff",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--format",
+            "csv",
+            "--key",
+            "id",
+            "--field-diff",
+            "--output",
+            str(FIXTURES / "bad-field-output.json"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "--field-diff --output supports only .jsonl" in captured.err
+
+
+def test_cli_schema_diff_output_requires_json(capsys):
+    exit_code = main(
+        [
+            "diff",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--format",
+            "csv",
+            "--schema-diff",
+            "--output",
+            str(FIXTURES / "bad-schema-output.jsonl"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "--schema-diff --output supports only .json" in captured.err
+
+
+def test_cli_result_mode_is_rejected_for_field_and_schema_modes(capsys):
+    exit_code = main(
+        [
+            "diff",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--format",
+            "csv",
+            "--key",
+            "id",
+            "--field-diff",
+            "--result-mode",
+            "file",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "--result-mode is not used with --field-diff or --schema-diff" in captured.err
+
+
 def test_cli_compare_help_mentions_parquet(capsys):
     with pytest.raises(SystemExit) as exc_info:
         main(["compare", "--help"])
@@ -426,6 +530,76 @@ def test_documented_cli_fixture_duplicates_summary_example(capsys):
 
     assert exit_code == 1
     assert payload == {"duplicate_count": 2, "empty": False}
+
+
+def test_readme_quick_start_commands_work_in_fixture_workspace(capsys):
+    old = FIXTURES / "readme-old.csv"
+    new = FIXTURES / "readme-new.csv"
+    old.unlink(missing_ok=True)
+    new.unlink(missing_ok=True)
+
+    try:
+        old.write_text(
+            "id,name,status\n1,Alice,active\n2,Bob,pending\n3,Cara,active\n",
+            encoding="utf-8",
+        )
+        new.write_text(
+            "id,name,status\n2,Bob,active\n3,Cara,active\n4,Dana,pending\n",
+            encoding="utf-8",
+        )
+
+        summary_exit = main(
+            [
+                "diff",
+                str(old),
+                str(new),
+                "--format",
+                "csv",
+                "--key",
+                "id",
+                "--summary",
+            ]
+        )
+        summary = json.loads(capsys.readouterr().out)
+
+        field_exit = main(
+            [
+                "diff",
+                str(old),
+                str(new),
+                "--format",
+                "csv",
+                "--key",
+                "id",
+                "--field-diff",
+            ]
+        )
+        field_payload = json.loads(capsys.readouterr().out)
+
+        schema_exit = main(
+            [
+                "diff",
+                str(old),
+                str(new),
+                "--format",
+                "csv",
+                "--schema-diff",
+                "--summary",
+            ]
+        )
+        schema_summary = json.loads(capsys.readouterr().out)
+    finally:
+        old.unlink(missing_ok=True)
+        new.unlink(missing_ok=True)
+
+    assert summary_exit == 0
+    assert summary["only_in_first_count"] == 1
+    assert summary["only_in_second_count"] == 1
+    assert summary["common_count"] == 2
+    assert field_exit == 0
+    assert field_payload["summary_by_column"] == {"status": 1}
+    assert schema_exit == 0
+    assert schema_summary["equal"] is True
 
 
 def test_cli_docs_cover_documented_flags():

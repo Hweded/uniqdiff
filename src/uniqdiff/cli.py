@@ -33,6 +33,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     try:
+        _validate_args(args)
         payload = _run_command(args)
     except (OSError, UniqDiffError, ValueError) as exc:
         print(_format_error(exc), file=sys.stderr)
@@ -372,6 +373,33 @@ def _run_command(
         return result.common or []
 
     return result
+
+
+def _validate_args(args: argparse.Namespace) -> None:
+    command = getattr(args, "command", None)
+    if command not in {"compare", "diff", "intersection"}:
+        return
+
+    field_diff = bool(getattr(args, "field_diff", False))
+    schema_diff = bool(getattr(args, "schema_diff", False))
+    output = getattr(args, "output", None)
+    result_mode = getattr(args, "result_mode", "memory")
+
+    if field_diff and schema_diff:
+        raise ValueError("--schema-diff cannot be combined with --field-diff")
+    if schema_diff and command == "intersection":
+        raise ValueError("--schema-diff is supported only for compare and diff")
+    if field_diff and command == "intersection":
+        raise ValueError("--field-diff is supported only for compare and diff")
+    if field_diff and not getattr(args, "key", None):
+        raise ValueError("--field-diff requires --key")
+
+    if (field_diff or schema_diff) and result_mode != "memory":
+        raise ValueError("--result-mode is not used with --field-diff or --schema-diff")
+    if schema_diff and output is not None and Path(output).suffix.lower() != ".json":
+        raise ValueError("--schema-diff --output supports only .json")
+    if field_diff and output is not None and Path(output).suffix.lower() != ".jsonl":
+        raise ValueError("--field-diff --output supports only .jsonl")
 
 
 def _parse_key(value: Optional[str]) -> Optional[Union[str, tuple[str, ...]]]:

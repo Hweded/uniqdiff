@@ -27,6 +27,8 @@
   metadata/warnings for the indexed second input.
 - Documented schema-diff result schema and added loose numeric type inference
   through `strict_numeric_types=False` / `--loose-numeric-types`.
+- Added stricter CLI validation for field/schema diff mode combinations and
+  output formats.
 
 ## 1.0.0
 

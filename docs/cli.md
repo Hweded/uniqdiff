@@ -170,6 +170,13 @@ uniqdiff diff old.csv new.csv \
 `--summary` returns counters and `summary_by_column`, which is useful in CI/CD
 when the full changed-row output is too large.
 
+Field-diff CLI constraints:
+
+- `--field-diff` requires `--key`;
+- `--field-diff` cannot be combined with `--schema-diff`;
+- `--field-diff --output` supports only `.jsonl`;
+- `--result-mode` is not used with `--field-diff`.
+
 ## Schema Diff
 
 Use `--schema-diff` when you need an engine-level check for structural changes:
@@ -194,6 +201,12 @@ By default, empty strings count as null-like values for schema inference. Use
 values. By default, `int` and `float` are distinct inferred types. Use
 `--loose-numeric-types` when both should be treated as `number`. For very large
 files, use `--schema-sample-size` to inspect only the first N rows per input.
+
+Schema-diff CLI constraints:
+
+- `--schema-diff` cannot be combined with `--field-diff`;
+- `--schema-diff --output` supports only `.json`;
+- `--result-mode` is not used with `--schema-diff`.
 
 ## Fixture Smoke Examples
 
