@@ -450,6 +450,7 @@ def test_cli_docs_cover_documented_flags():
         "--schema-diff",
         "--schema-sample-size",
         "--empty-string-not-null",
+        "--loose-numeric-types",
         "--memory-limit",
         "--mode",
         "--no-header",

@@ -416,6 +416,7 @@ def compare_file_schema(
     batch_size: int = 65_536,
     sample_size: Optional[int] = None,
     empty_string_null: bool = True,
+    strict_numeric_types: bool = True,
 ) -> SchemaDiffResult:
     """Compare inferred schemas for two supported files."""
 
@@ -432,6 +433,7 @@ def compare_file_schema(
         batch_size=batch_size,
         sample_size=sample_size,
         empty_string_null=empty_string_null,
+        strict_numeric_types=strict_numeric_types,
     )
 
 

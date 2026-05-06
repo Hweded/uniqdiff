@@ -1,4 +1,5 @@
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from uniqdiff import compare_file_schema, compare_schema, infer_schema
@@ -77,6 +78,53 @@ def test_schema_diff_sampling_sets_warning():
     assert result.warnings == ["Schema diff was inferred from sampled rows."]
 
 
+def test_infer_schema_accepts_dataclass_and_object_rows():
+    @dataclass
+    class User:
+        id: int
+        name: str
+
+    class Account:
+        def __init__(self, id_value: int, active: bool) -> None:
+            self.id = id_value
+            self.active = active
+
+    dataclass_schema = infer_schema([User(1, "Ann")])
+    object_schema = infer_schema([Account(1, True)])
+
+    assert dataclass_schema.columns["name"].types == ("str",)
+    assert object_schema.columns["active"].types == ("bool",)
+
+
+def test_schema_diff_can_treat_empty_string_as_string():
+    result = compare_schema(
+        [{"id": 1, "name": "Ann"}],
+        [{"id": 1, "name": ""}],
+        empty_string_null=False,
+    )
+
+    assert result.nullable_changes == []
+    assert result.has_changes is False
+
+
+def test_schema_diff_can_use_loose_numeric_types():
+    strict = compare_schema(
+        [{"id": 1, "amount": 1}],
+        [{"id": 1, "amount": 1.5}],
+    )
+    loose = compare_schema(
+        [{"id": 1, "amount": 1}],
+        [{"id": 1, "amount": 1.5}],
+        strict_numeric_types=False,
+    )
+
+    assert strict.type_changes == [
+        {"column": "amount", "left_types": ["int"], "right_types": ["float"]}
+    ]
+    assert loose.type_changes == []
+    assert loose.left_schema.columns["amount"].types == ("number",)
+
+
 def test_cli_schema_diff_summary_and_fail_on_diff(capsys):
     left = FIXTURES / "cli-schema-left.csv"
     right = FIXTURES / "cli-schema-right.csv"
@@ -96,6 +144,7 @@ def test_cli_schema_diff_summary_and_fail_on_diff(capsys):
                 "--schema-diff",
                 "--summary",
                 "--fail-on-diff",
+                "--loose-numeric-types",
             ]
         )
         payload = json.loads(capsys.readouterr().out)

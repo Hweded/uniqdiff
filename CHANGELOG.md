@@ -25,6 +25,8 @@
   inputs, CLI summary output, and CI exit-code support.
 - Added lazy reading for field-diff JSONL output and explicit duplicate-key
   metadata/warnings for the indexed second input.
+- Documented schema-diff result schema and added loose numeric type inference
+  through `strict_numeric_types=False` / `--loose-numeric-types`.
 
 ## 1.0.0
 

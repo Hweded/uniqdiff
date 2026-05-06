@@ -223,6 +223,11 @@ def _add_schema_diff_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Treat empty strings as strings instead of nulls in --schema-diff.",
     )
+    parser.add_argument(
+        "--loose-numeric-types",
+        action="store_true",
+        help="Treat int and float as a shared number type in --schema-diff.",
+    )
 
 
 def _add_common_behavior_args(parser: argparse.ArgumentParser) -> None:
@@ -311,6 +316,7 @@ def _run_command(
             batch_size=args.parquet_batch_size,
             sample_size=args.schema_sample_size,
             empty_string_null=not args.empty_string_not_null,
+            strict_numeric_types=not args.loose_numeric_types,
         )
 
     if getattr(args, "field_diff", False):

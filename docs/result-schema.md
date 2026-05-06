@@ -156,3 +156,75 @@ This behavior is surfaced through:
 - a warning when the count is greater than zero.
 
 Changing this default behavior would be a compatibility-affecting change.
+
+## Schema Result
+
+`infer_schema()` returns `SchemaResult`.
+
+Stable fields:
+
+- `columns`: mapping of column name to `ColumnSchema`;
+- `row_count`: number of inspected rows;
+- `sampled`: whether inference stopped because `sample_size` was reached.
+
+## `ColumnSchema`
+
+Stable fields:
+
+- `name`;
+- `types`;
+- `nullable`;
+- `present_count`;
+- `null_count`;
+- `missing_count`.
+
+The current inferred type names are:
+
+- `bool`;
+- `int`;
+- `float`;
+- `number` when `strict_numeric_types=False`;
+- `str`;
+- `list`;
+- `tuple`;
+- `object`;
+- custom class name for other values.
+
+Schema inference is based on observed values. It is not a database DDL parser.
+
+## Schema Diff Result
+
+`compare_schema()` and `compare_file_schema()` return `SchemaDiffResult`.
+
+Stable fields:
+
+- `added_columns`;
+- `removed_columns`;
+- `type_changes`;
+- `nullable_changes`;
+- `left_schema`;
+- `right_schema`;
+- `metadata`;
+- `warnings`.
+
+Each `type_changes` item has:
+
+- `column`;
+- `left_types`;
+- `right_types`.
+
+Each `nullable_changes` item has:
+
+- `column`;
+- `left_nullable`;
+- `right_nullable`.
+
+The `has_changes` property is true when added columns, removed columns, type
+changes, or nullable changes are present.
+
+When `sample_size` is used and at least one input has more rows than the sample,
+`warnings` includes:
+
+```text
+Schema diff was inferred from sampled rows.
+```

@@ -90,6 +90,7 @@ def infer_schema(
     *,
     sample_size: Optional[int] = None,
     empty_string_null: bool = True,
+    strict_numeric_types: bool = True,
 ) -> SchemaResult:
     """Infer simple column names, value types, and nullability from structured rows."""
 
@@ -112,7 +113,11 @@ def infer_schema(
         for name in set(trackers) - row_fields:
             trackers[name].missing_count += 1
         for name, value in mapping.items():
-            trackers[name].record(value, empty_string_null=empty_string_null)
+            trackers[name].record(
+                value,
+                empty_string_null=empty_string_null,
+                strict_numeric_types=strict_numeric_types,
+            )
         row_count += 1
 
     return SchemaResult(
@@ -128,6 +133,7 @@ def compare_schema(
     *,
     sample_size: Optional[int] = None,
     empty_string_null: bool = True,
+    strict_numeric_types: bool = True,
 ) -> SchemaDiffResult:
     """Infer and compare schemas for two structured inputs."""
 
@@ -135,11 +141,13 @@ def compare_schema(
         first,
         sample_size=sample_size,
         empty_string_null=empty_string_null,
+        strict_numeric_types=strict_numeric_types,
     )
     right = infer_schema(
         second,
         sample_size=sample_size,
         empty_string_null=empty_string_null,
+        strict_numeric_types=strict_numeric_types,
     )
     return _diff_schemas(
         left,
@@ -147,6 +155,7 @@ def compare_schema(
         metadata={
             "sample_size": sample_size,
             "empty_string_null": empty_string_null,
+            "strict_numeric_types": strict_numeric_types,
         },
     )
 
@@ -165,6 +174,7 @@ def compare_file_schema(
     batch_size: int = 65_536,
     sample_size: Optional[int] = None,
     empty_string_null: bool = True,
+    strict_numeric_types: bool = True,
 ) -> SchemaDiffResult:
     """Read supported files and compare their inferred schemas."""
 
@@ -195,6 +205,7 @@ def compare_file_schema(
         second,
         sample_size=sample_size,
         empty_string_null=empty_string_null,
+        strict_numeric_types=strict_numeric_types,
     )
     result.metadata["format"] = format
     result.metadata["columns"] = list(columns) if columns is not None else None
@@ -209,12 +220,18 @@ class _ColumnTracker:
     null_count: int = 0
     missing_count: int = 0
 
-    def record(self, value: Any, *, empty_string_null: bool) -> None:
+    def record(
+        self,
+        value: Any,
+        *,
+        empty_string_null: bool,
+        strict_numeric_types: bool,
+    ) -> None:
         self.present_count += 1
         if _is_null(value, empty_string_null=empty_string_null):
             self.null_count += 1
             return
-        self.types.add(_type_name(value))
+        self.types.add(_type_name(value, strict_numeric_types=strict_numeric_types))
 
     def to_schema(self) -> ColumnSchema:
         return ColumnSchema(
@@ -290,13 +307,13 @@ def _is_null(value: Any, *, empty_string_null: bool) -> bool:
     return value is None or (empty_string_null and value == "")
 
 
-def _type_name(value: Any) -> str:
+def _type_name(value: Any, *, strict_numeric_types: bool) -> str:
     if isinstance(value, bool):
         return "bool"
     if isinstance(value, int) and not isinstance(value, bool):
-        return "int"
+        return "int" if strict_numeric_types else "number"
     if isinstance(value, float):
-        return "float"
+        return "float" if strict_numeric_types else "number"
     if isinstance(value, str):
         return "str"
     if isinstance(value, list):

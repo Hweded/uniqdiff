@@ -68,6 +68,7 @@ Output and behavior flags:
 - `--schema-diff` for inferred column/type/nullability changes;
 - `--schema-sample-size 10000` for limiting schema inference rows;
 - `--empty-string-not-null` for treating empty strings as string values in schema inference;
+- `--loose-numeric-types` for treating `int` and `float` as a shared `number` type;
 - `--summary`;
 - `--fail-on-diff`;
 - `--lower`;
@@ -190,8 +191,9 @@ Schema diff reports:
 
 By default, empty strings count as null-like values for schema inference. Use
 `--empty-string-not-null` when empty strings should remain ordinary string
-values. For very large files, use `--schema-sample-size` to inspect only the
-first N rows per input.
+values. By default, `int` and `float` are distinct inferred types. Use
+`--loose-numeric-types` when both should be treated as `number`. For very large
+files, use `--schema-sample-size` to inspect only the first N rows per input.
 
 ## Fixture Smoke Examples
 

@@ -102,7 +102,9 @@ Infers column names, observed value types, and nullability from structured rows.
 Important parameters:
 
 - `sample_size`: optional maximum rows to inspect;
-- `empty_string_null`: treat empty strings as null-like values when `True`.
+- `empty_string_null`: treat empty strings as null-like values when `True`;
+- `strict_numeric_types`: keep `int` and `float` separate when `True`, or infer
+  both as `number` when `False`.
 
 Returns `SchemaResult`.
 
@@ -125,7 +127,8 @@ Returns `SchemaDiffResult`.
 ## `compare_file_schema(file_a, file_b, ...)`
 
 Reads supported files and runs schema-aware diff. It accepts the same file reader
-options as `compare_files()` plus `sample_size` and `empty_string_null`.
+options as `compare_files()` plus `sample_size`, `empty_string_null`, and
+`strict_numeric_types`.
 
 ## `compare_files(file_a, file_b, ...)`
 
