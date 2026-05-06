@@ -21,6 +21,8 @@
   and fast-pathing common scalar JSON values.
 - Added engine-level field comparison with column filters, summary-by-column,
   JSONL streaming output, max row/byte limits, public APIs, and CLI flags.
+- Added schema-aware diff for inferred columns, value types, nullability, file
+  inputs, CLI summary output, and CI exit-code support.
 
 ## 1.0.0
 

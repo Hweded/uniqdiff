@@ -65,6 +65,9 @@ Output and behavior flags:
 - `--exclude-columns name,updated_at` for `--field-diff`;
 - `--max-rows 1000` for limiting emitted field-diff rows;
 - `--max-bytes 10MB` for limiting streamed field-diff JSONL output;
+- `--schema-diff` for inferred column/type/nullability changes;
+- `--schema-sample-size 10000` for limiting schema inference rows;
+- `--empty-string-not-null` for treating empty strings as string values in schema inference;
 - `--summary`;
 - `--fail-on-diff`;
 - `--lower`;
@@ -166,6 +169,30 @@ uniqdiff diff old.csv new.csv \
 `--summary` returns counters and `summary_by_column`, which is useful in CI/CD
 when the full changed-row output is too large.
 
+## Schema Diff
+
+Use `--schema-diff` when you need an engine-level check for structural changes:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --schema-diff \
+  --summary \
+  --fail-on-diff
+```
+
+Schema diff reports:
+
+- added columns;
+- removed columns;
+- changed inferred value types;
+- changed nullability.
+
+By default, empty strings count as null-like values for schema inference. Use
+`--empty-string-not-null` when empty strings should remain ordinary string
+values. For very large files, use `--schema-sample-size` to inspect only the
+first N rows per input.
+
 ## Fixture Smoke Examples
 
 The repository keeps small fixture files under `tests/fixtures` so CLI examples can be
@@ -176,6 +203,7 @@ uniqdiff compare tests/fixtures/left.csv tests/fixtures/right.csv --format csv -
 uniqdiff compare tests/fixtures/left.tsv tests/fixtures/right.tsv --format tsv --key id
 uniqdiff diff tests/fixtures/left.txt tests/fixtures/right.txt --format txt --output diff.json
 uniqdiff diff tests/fixtures/left.csv tests/fixtures/right.csv --format csv --key id --field-diff --columns name --summary
+uniqdiff diff tests/fixtures/left.csv tests/fixtures/right.csv --format csv --schema-diff --summary
 uniqdiff intersection tests/fixtures/left.jsonl tests/fixtures/right.jsonl --format jsonl --key id
 uniqdiff duplicates tests/fixtures/dupes.txt --format txt --summary --fail-on-diff
 ```

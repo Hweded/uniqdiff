@@ -86,6 +86,38 @@ Parquet inputs follow the same reader options as `compare_files()`.
 
 Alias-style public facade for file-oriented field comparison.
 
+## `infer_schema(rows, ...)`
+
+Infers column names, observed value types, and nullability from structured rows.
+
+Important parameters:
+
+- `sample_size`: optional maximum rows to inspect;
+- `empty_string_null`: treat empty strings as null-like values when `True`.
+
+Returns `SchemaResult`.
+
+## `compare_schema(first, second, ...)`
+
+Infers and compares schemas for two structured inputs.
+
+The result reports:
+
+- `added_columns`;
+- `removed_columns`;
+- `type_changes`;
+- `nullable_changes`;
+- `left_schema`;
+- `right_schema`;
+- `warnings`.
+
+Returns `SchemaDiffResult`.
+
+## `compare_file_schema(file_a, file_b, ...)`
+
+Reads supported files and runs schema-aware diff. It accepts the same file reader
+options as `compare_files()` plus `sample_size` and `empty_string_null`.
+
 ## `compare_files(file_a, file_b, ...)`
 
 Reads supported files and compares their rows/items.

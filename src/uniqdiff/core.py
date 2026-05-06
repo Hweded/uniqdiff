@@ -15,6 +15,10 @@ from uniqdiff.fields import compare_fields as _compare_fields
 from uniqdiff.fields import compare_fields_files as _compare_fields_files
 from uniqdiff.planner import build_duplicates_plan, build_execution_plan, disk_compare_backend
 from uniqdiff.result import CompareResult, CompareStats
+from uniqdiff.schema import SchemaDiffResult, SchemaResult
+from uniqdiff.schema import compare_file_schema as _compare_file_schema
+from uniqdiff.schema import compare_schema as _compare_schema
+from uniqdiff.schema import infer_schema as _infer_schema
 from uniqdiff.storage import (
     compare_memory,
     duplicates_external_sort,
@@ -250,6 +254,22 @@ def compare_fields_files(
     return _compare_fields_files(file_a, file_b, key=key, **kwargs)
 
 
+def infer_schema(rows: Iterable[Any], **kwargs: Any) -> SchemaResult:
+    """Infer simple column names, value types, and nullability from structured rows."""
+
+    return _infer_schema(rows, **kwargs)
+
+
+def compare_schema(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    **kwargs: Any,
+) -> SchemaDiffResult:
+    """Compare inferred schemas for two structured inputs."""
+
+    return _compare_schema(first, second, **kwargs)
+
+
 def compare_iter(first: Iterable[Any], second: Iterable[Any], **kwargs: Any) -> CompareResult:
     """Compare generic iterables or generators."""
 
@@ -379,6 +399,39 @@ def compare_file_fields(
         output=output,
         max_rows=max_rows,
         max_bytes=max_bytes,
+    )
+
+
+def compare_file_schema(
+    file_a: str,
+    file_b: str,
+    *,
+    format: str = "auto",
+    encoding: str = "utf-8",
+    delimiter: Optional[str] = None,
+    quotechar: Optional[str] = '"',
+    has_header: bool = True,
+    fieldnames: Optional[Sequence[str]] = None,
+    columns: Optional[Sequence[str]] = None,
+    batch_size: int = 65_536,
+    sample_size: Optional[int] = None,
+    empty_string_null: bool = True,
+) -> SchemaDiffResult:
+    """Compare inferred schemas for two supported files."""
+
+    return _compare_file_schema(
+        file_a,
+        file_b,
+        format=format,
+        encoding=encoding,
+        delimiter=delimiter,
+        quotechar=quotechar,
+        has_header=has_header,
+        fieldnames=fieldnames,
+        columns=columns,
+        batch_size=batch_size,
+        sample_size=sample_size,
+        empty_string_null=empty_string_null,
     )
 
 
