@@ -179,6 +179,73 @@ def test_cli_compare_summary_outputs_counters(capsys):
     assert payload["backend"] == "memory"
 
 
+def test_cli_field_diff_outputs_changed_fields(capsys):
+    exit_code = main(
+        [
+            "diff",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--format",
+            "csv",
+            "--key",
+            "id",
+            "--field-diff",
+            "--columns",
+            "name",
+        ]
+    )
+
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["rows"] == []
+    assert payload["summary_by_column"] == {}
+    assert payload["stats"]["changed_row_count"] == 0
+
+
+def test_cli_field_diff_writes_jsonl_and_summary(capsys):
+    left = FIXTURES / "cli-field-left.csv"
+    right = FIXTURES / "cli-field-right.csv"
+    output = FIXTURES / "cli-field-diff.jsonl"
+    left.write_text("id,name,city\n1,Ann,Paris\n2,Bob,Berlin\n", encoding="utf-8")
+    right.write_text("id,name,city\n1,Anne,Paris\n2,Bob,Rome\n", encoding="utf-8")
+    output.unlink(missing_ok=True)
+
+    try:
+        exit_code = main(
+            [
+                "diff",
+                str(left),
+                str(right),
+                "--format",
+                "csv",
+                "--key",
+                "id",
+                "--field-diff",
+                "--exclude-columns",
+                "city",
+                "--max-rows",
+                "1",
+                "--output",
+                str(output),
+                "--summary",
+                "--fail-on-diff",
+            ]
+        )
+        payload = json.loads(capsys.readouterr().out)
+        rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    finally:
+        left.unlink(missing_ok=True)
+        right.unlink(missing_ok=True)
+        output.unlink(missing_ok=True)
+
+    assert exit_code == 1
+    assert payload["changed_row_count"] == 1
+    assert payload["changed_field_count"] == 1
+    assert payload["summary_by_column"] == {"name": 1}
+    assert rows == [{"key": "1", "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]}]
+
+
 def test_cli_fail_on_diff_returns_one_for_differences(capsys):
     exit_code = main(
         [
@@ -376,6 +443,10 @@ def test_cli_docs_cover_documented_flags():
         "--include-duplicates",
         "--key",
         "--lower",
+        "--field-diff",
+        "--exclude-columns",
+        "--max-rows",
+        "--max-bytes",
         "--memory-limit",
         "--mode",
         "--no-header",

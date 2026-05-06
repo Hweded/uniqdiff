@@ -48,6 +48,44 @@ compound key.
 
 Compares values by stable cryptographic hash of the canonical representation.
 
+## `compare_fields(first, second, key=...)`
+
+Compares structured rows that share the same key and returns field-level changes.
+This is intended for engine-level row diff workflows, not formatted reports.
+
+Important parameters:
+
+- `key`: required row key;
+- `columns`: optional fields to compare;
+- `exclude_columns`: fields to ignore;
+- `normalizer`: optional value normalizer before comparison;
+- `output`: optional `.jsonl` path for streaming changed rows;
+- `max_rows`: maximum changed rows to emit;
+- `max_bytes`: maximum JSONL output bytes when streaming.
+
+Returns `FieldDiffResult` with:
+
+- `rows`: changed rows when no output file is used;
+- `summary_by_column`: changed-field counts by column;
+- `stats`: counts, truncation flag, and output bytes;
+- `metadata`;
+- `warnings`.
+
+Streaming JSONL rows use this shape:
+
+```python
+{"key": row_key, "changes": [{"field": "status", "left": "old", "right": "new"}]}
+```
+
+## `compare_fields_files(file_a, file_b, key=...)`
+
+Reads supported files and runs `compare_fields()`. CSV, TSV, JSONL, TXT, and
+Parquet inputs follow the same reader options as `compare_files()`.
+
+## `compare_file_fields(file_a, file_b, key=...)`
+
+Alias-style public facade for file-oriented field comparison.
+
 ## `compare_files(file_a, file_b, ...)`
 
 Reads supported files and compares their rows/items.

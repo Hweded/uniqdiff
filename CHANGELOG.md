@@ -19,6 +19,8 @@
   binary temp records for hash partitioning and external sort.
 - Reduced JSONL file-result overhead by avoiding per-row result dict allocation
   and fast-pathing common scalar JSON values.
+- Added engine-level field comparison with column filters, summary-by-column,
+  JSONL streaming output, max row/byte limits, public APIs, and CLI flags.
 
 ## 1.0.0
 

@@ -61,6 +61,10 @@ Output and behavior flags:
 - `--result-mode memory|file` for `compare`, `diff`, and `intersection`;
 - `--output path.json|path.jsonl|path.csv` for `compare`, `diff`, and `intersection`;
 - `--include-duplicates` for comparison commands;
+- `--field-diff` for field-level changes between rows with the same `--key`;
+- `--exclude-columns name,updated_at` for `--field-diff`;
+- `--max-rows 1000` for limiting emitted field-diff rows;
+- `--max-bytes 10MB` for limiting streamed field-diff JSONL output;
 - `--summary`;
 - `--fail-on-diff`;
 - `--lower`;
@@ -124,6 +128,44 @@ uniqdiff compare old.csv new.csv \
 File result mode applies to `compare`, `diff`, and `intersection`. The `duplicates`
 command returns JSON to stdout and can be reduced with `--summary`.
 
+## Field-Level Diff
+
+Use `--field-diff` when both inputs contain rows with stable keys and you need to
+know which fields changed inside matching rows:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --key id \
+  --field-diff \
+  --columns name,status,email \
+  --summary
+```
+
+Field-level diff is an engine feature, not a report generator. It emits rows with
+this JSON shape:
+
+```json
+{"key":"123","changes":[{"field":"status","left":"draft","right":"active"}]}
+```
+
+For large outputs, write changed rows directly to JSONL:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --key id \
+  --field-diff \
+  --exclude-columns updated_at,loaded_at \
+  --max-rows 100000 \
+  --max-bytes 100MB \
+  --output changed-fields.jsonl \
+  --summary
+```
+
+`--summary` returns counters and `summary_by_column`, which is useful in CI/CD
+when the full changed-row output is too large.
+
 ## Fixture Smoke Examples
 
 The repository keeps small fixture files under `tests/fixtures` so CLI examples can be
@@ -133,6 +175,7 @@ verified in tests:
 uniqdiff compare tests/fixtures/left.csv tests/fixtures/right.csv --format csv --key id --summary
 uniqdiff compare tests/fixtures/left.tsv tests/fixtures/right.tsv --format tsv --key id
 uniqdiff diff tests/fixtures/left.txt tests/fixtures/right.txt --format txt --output diff.json
+uniqdiff diff tests/fixtures/left.csv tests/fixtures/right.csv --format csv --key id --field-diff --columns name --summary
 uniqdiff intersection tests/fixtures/left.jsonl tests/fixtures/right.jsonl --format jsonl --key id
 uniqdiff duplicates tests/fixtures/dupes.txt --format txt --summary --fail-on-diff
 ```

@@ -10,6 +10,9 @@ from uniqdiff._typing import KeySpec, Normalizer
 from uniqdiff._utils import canonicalize
 from uniqdiff.connectors import connect
 from uniqdiff.disk import atomic_write_result
+from uniqdiff.fields import FieldDiffResult
+from uniqdiff.fields import compare_fields as _compare_fields
+from uniqdiff.fields import compare_fields_files as _compare_fields_files
 from uniqdiff.planner import build_duplicates_plan, build_execution_plan, disk_compare_backend
 from uniqdiff.result import CompareResult, CompareStats
 from uniqdiff.storage import (
@@ -223,6 +226,30 @@ def compare_by_hash(
     return compare(first, second, key=hash_key, strategy=f"hash:{algorithm}", **kwargs)
 
 
+def compare_fields(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec,
+    **kwargs: Any,
+) -> FieldDiffResult:
+    """Compare changed fields for keyed structured rows."""
+
+    return _compare_fields(first, second, key=key, **kwargs)
+
+
+def compare_fields_files(
+    file_a: str,
+    file_b: str,
+    *,
+    key: KeySpec,
+    **kwargs: Any,
+) -> FieldDiffResult:
+    """Compare changed fields for keyed rows in two supported files."""
+
+    return _compare_fields_files(file_a, file_b, key=key, **kwargs)
+
+
 def compare_iter(first: Iterable[Any], second: Iterable[Any], **kwargs: Any) -> CompareResult:
     """Compare generic iterables or generators."""
 
@@ -311,6 +338,47 @@ def compare_files(
         first_options=file_options,
         second_options=file_options,
         **kwargs,
+    )
+
+
+def compare_file_fields(
+    file_a: str,
+    file_b: str,
+    *,
+    key: KeySpec,
+    format: str = "auto",
+    encoding: str = "utf-8",
+    delimiter: Optional[str] = None,
+    quotechar: Optional[str] = '"',
+    has_header: bool = True,
+    fieldnames: Optional[Sequence[str]] = None,
+    columns: Optional[Sequence[str]] = None,
+    exclude_columns: Optional[Sequence[str]] = None,
+    batch_size: int = 65_536,
+    normalizer: Optional[Normalizer] = None,
+    output: Optional[str] = None,
+    max_rows: Optional[int] = None,
+    max_bytes: Optional[Union[str, int]] = None,
+) -> FieldDiffResult:
+    """Compare changed fields for keyed rows in two supported files."""
+
+    return _compare_fields_files(
+        file_a,
+        file_b,
+        key=key,
+        format=format,
+        encoding=encoding,
+        delimiter=delimiter,
+        quotechar=quotechar,
+        has_header=has_header,
+        fieldnames=fieldnames,
+        columns=columns,
+        exclude_columns=exclude_columns,
+        batch_size=batch_size,
+        normalizer=normalizer,
+        output=output,
+        max_rows=max_rows,
+        max_bytes=max_bytes,
     )
 
 

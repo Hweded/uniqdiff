@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from uniqdiff import compare_files, duplicates
+from uniqdiff import FieldDiffResult, compare_file_fields, compare_files, duplicates
 from uniqdiff.disk import atomic_write_result
 from uniqdiff.exceptions import UniqDiffError
 from uniqdiff.io.readers import read_file
@@ -33,6 +33,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     if isinstance(payload, CompareResult):
         return _handle_compare_result(payload, args)
+    if isinstance(payload, FieldDiffResult):
+        return _handle_field_diff_result(payload, args)
     return _handle_list_result(payload, args)
 
 
@@ -44,6 +46,19 @@ def _handle_compare_result(result: CompareResult, args: argparse.Namespace) -> i
         return _exit_code(result, args)
     if args.output:
         atomic_write_result(result, args.output)
+    else:
+        _write_stdout(result.to_dict())
+    return _exit_code(result, args)
+
+
+def _handle_field_diff_result(result: FieldDiffResult, args: argparse.Namespace) -> int:
+    if args.summary:
+        _write_stdout(_field_summary_payload(result))
+        return _exit_code(result, args)
+    if result.metadata.get("result_mode") == "file":
+        return _exit_code(result, args)
+    if args.output:
+        _atomic_write_json(result.to_dict(), args.output)
     else:
         _write_stdout(result.to_dict())
     return _exit_code(result, args)
@@ -78,6 +93,8 @@ def _build_parser() -> argparse.ArgumentParser:
             action="store_true",
             help="Include duplicates from both inputs in compare results.",
         )
+        if name in {"compare", "diff"}:
+            _add_field_diff_args(command)
 
     duplicates_command = subparsers.add_parser("duplicates", help="Find duplicates in one file")
     _add_input_file_args(duplicates_command, two_files=False)
@@ -150,6 +167,27 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_field_diff_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--field-diff",
+        action="store_true",
+        help="Compare changed fields for rows with the same --key.",
+    )
+    parser.add_argument(
+        "--exclude-columns",
+        help="Comma-separated columns to ignore in --field-diff.",
+    )
+    parser.add_argument(
+        "--max-rows",
+        type=int,
+        help="Maximum changed rows to emit for --field-diff.",
+    )
+    parser.add_argument(
+        "--max-bytes",
+        help="Maximum JSONL bytes to write for streaming --field-diff output.",
+    )
+
+
 def _add_common_behavior_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--summary",
@@ -189,7 +227,7 @@ def _add_common_behavior_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def _run_command(args: argparse.Namespace) -> Union[CompareResult, list[Any]]:
+def _run_command(args: argparse.Namespace) -> Union[CompareResult, FieldDiffResult, list[Any]]:
     key = _parse_key(args.key)
     normalizer = _build_normalizer(args)
     fieldnames = _parse_fieldnames(args.fieldnames)
@@ -216,6 +254,28 @@ def _run_command(args: argparse.Namespace) -> Union[CompareResult, list[Any]]:
             disk_limit=args.disk_limit,
             disk_strategy=args.disk_strategy,
             partition_count=args.partition_count,
+        )
+
+    if getattr(args, "field_diff", False):
+        if key is None:
+            raise ValueError("--field-diff requires --key")
+        return compare_file_fields(
+            args.file_a,
+            args.file_b,
+            format=args.format,
+            encoding=args.encoding,
+            delimiter=args.delimiter,
+            quotechar=args.quotechar,
+            has_header=not args.no_header,
+            fieldnames=fieldnames,
+            columns=columns,
+            batch_size=args.parquet_batch_size,
+            key=key,
+            normalizer=normalizer,
+            output=args.output,
+            max_rows=args.max_rows,
+            max_bytes=args.max_bytes,
+            exclude_columns=_parse_fieldnames(args.exclude_columns),
         )
 
     include_common = args.command in {"compare", "intersection"}
@@ -307,17 +367,36 @@ def _summary_payload(result: CompareResult) -> dict[str, Any]:
     }
 
 
+def _field_summary_payload(result: FieldDiffResult) -> dict[str, Any]:
+    stats = result.stats.to_dict()
+    return {
+        "equal": stats["changed_row_count"] == 0,
+        "changed_row_count": stats["changed_row_count"],
+        "changed_field_count": stats["changed_field_count"],
+        "emitted_row_count": stats["emitted_row_count"],
+        "compared_count": stats["compared_count"],
+        "first_count": stats["first_count"],
+        "second_count": stats["second_count"],
+        "summary_by_column": result.summary_by_column,
+        "truncated": stats["truncated"],
+        "output": result.metadata.get("output"),
+        "warnings": result.warnings,
+    }
+
+
 def _list_summary_payload(payload: list[Any], command: str) -> dict[str, Any]:
     count_name = "duplicate_count" if command == "duplicates" else "count"
     return {count_name: len(payload), "empty": len(payload) == 0}
 
 
 def _exit_code(
-    payload: Union[CompareResult, list[Any], dict[str, Any]],
+    payload: Union[CompareResult, FieldDiffResult, list[Any], dict[str, Any]],
     args: argparse.Namespace,
 ) -> int:
     if not args.fail_on_diff:
         return 0
+    if isinstance(payload, FieldDiffResult) and args.command in {"compare", "diff"}:
+        return 1 if payload.stats.changed_row_count > 0 else 0
     if isinstance(payload, CompareResult) and args.command in {"compare", "diff"}:
         stats = payload.stats
         has_diff = stats.only_in_first_count > 0 or stats.only_in_second_count > 0

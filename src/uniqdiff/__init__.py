@@ -20,6 +20,9 @@ from uniqdiff.core import (
     compare,
     compare_by_hash,
     compare_by_key,
+    compare_fields,
+    compare_fields_files,
+    compare_file_fields,
     compare_files,
     compare_iter,
     compare_sorted_iter,
@@ -44,6 +47,7 @@ from uniqdiff.exceptions import (
     UniqDiffError,
     UnsupportedFormatError,
 )
+from uniqdiff.fields import FieldChange, FieldDiffResult, FieldDiffStats
 from uniqdiff.fuzzy import compare_fuzzy_strings
 from uniqdiff.normalizers import compose_normalizers, string_normalizer
 from uniqdiff.output import iter_result_rows, iter_result_values
@@ -60,6 +64,9 @@ __all__ = [
     "CorruptedInputError",
     "DiskLimitExceededError",
     "FileConnector",
+    "FieldChange",
+    "FieldDiffResult",
+    "FieldDiffStats",
     "InvalidInputError",
     "IterableConnector",
     "JSONLConnector",
@@ -76,6 +83,9 @@ __all__ = [
     "build_bloom_filter",
     "connect",
     "compare",
+    "compare_fields",
+    "compare_file_fields",
+    "compare_fields_files",
     "compare_by_hash",
     "compare_by_key",
     "compare_files",
