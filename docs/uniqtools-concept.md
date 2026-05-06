@@ -3,9 +3,8 @@
 UniqTools is an ecosystem of small data comparison tools built on top of the
 stable `uniqdiff` engine.
 
-The goal is to keep `uniqdiff` focused on exact comparison semantics while
-higher-level packages provide workflows, reports, row-level analysis, data
-quality checks, and integrations.
+The goal is to keep `uniqdiff` focused on comparison-engine facts while higher-level
+packages provide workflows, reports, data quality checks, and integrations.
 
 ## Core Idea
 
@@ -15,13 +14,15 @@ quality checks, and integrations.
 - which records exist only in the second source;
 - which records are common by an exact token;
 - which records are duplicated by an exact token;
+- which fields changed for rows with the same key;
+- which inferred columns, value types, or nullable flags changed;
 - how the comparison was executed and which backend was used.
 
 UniqTools packages turn those engine facts into user-facing workflows:
 
 - profiling inputs before comparison;
 - detecting schema drift;
-- comparing changed fields inside matching rows;
+- turning field/schema facts into reviewable workflows;
 - producing reports;
 - running CI checks;
 - orchestrating repeatable local workflows.
@@ -43,6 +44,7 @@ uniqdiff stable comparison engine
         |
         v
 CompareResult / CompareStats / file result schema / lazy readers
+FieldDiffResult / SchemaDiffResult / streaming JSONL facts
         |
         v
 UniqTools product packages
@@ -70,16 +72,17 @@ It should not perform exact diff itself. When it needs comparison, it should cal
 
 ### uniqschema
 
-Infers and validates schemas for CSV, TSV, JSONL, and Parquet-like sources.
+Builds schema workflows for CSV, TSV, JSONL, and Parquet-like sources.
 
 Responsibilities:
 
-- schema inference;
+- schema policy management;
 - schema validation;
-- schema drift detection;
+- schema drift review workflows;
 - compatibility checks between old and new files.
 
-It should produce schema facts, not comparison engine internals.
+It may use `uniqdiff` schema facts, but validation policy and workflow behavior
+belong in `uniqschema`.
 
 ### uniqcheck
 
@@ -97,17 +100,16 @@ It may call `uniqdiff` for duplicate detection and presence checks.
 
 ### uniqrowdiff
 
-Compares changed fields for rows that share the same key.
+Builds product workflows around changed fields for rows that share the same key.
 
 Responsibilities:
 
-- match rows by key;
-- report field-level changes;
+- enrich engine field-diff output;
 - support ignore columns and normalization rules;
-- emit JSONL/CSV output suitable for reports and CI.
+- emit report-ready artifacts suitable for review, reports, and CI.
 
-This package is the natural home for row-level changed-fields logic. `uniqdiff`
-should continue to answer whether a key is present, common, or duplicated.
+`uniqdiff` owns the engine-level field-diff primitive. `uniqrowdiff` owns richer
+row-diff workflows, templates, policies, and product UX.
 
 ### uniqreport
 
@@ -148,6 +150,8 @@ UniqTools packages should use only documented `uniqdiff` contracts:
   `duplicates`, and `duplicates_source`;
 - `CompareResult` and `CompareStats`;
 - file result schema with `section` and `value`;
+- field-diff JSONL schema with `key` and `changes`;
+- schema diff result objects;
 - lazy readers such as `iter_result_rows` and `iter_result_values`;
 - connector protocol and registry helpers;
 - documented exception classes;
@@ -165,13 +169,15 @@ UniqTools packages should not import:
 
 The first UniqTools implementation should be intentionally small:
 
-1. Keep `uniqdiff` unchanged as the comparison engine.
+1. Keep `uniqdiff` as the comparison engine dependency.
 2. Add a tiny adapter layer in a separate package or example.
 3. Use `compare_files(..., result_mode="file")` for large output.
-4. Read sections with `CompareResult.iter_section(...)` or
+4. Use `compare_fields(...)` or `compare_file_schema(...)` for engine-level
+   field/schema facts.
+5. Read sections with `CompareResult.iter_section(...)` or
    `iter_result_values(...)`.
-5. Build summaries outside the engine.
-6. Add tool-specific output schemas only in the tool package.
+6. Build product summaries outside the engine.
+7. Add tool-specific output schemas only in the tool package.
 
 This makes the architecture easy to test and easy to split into separate
 repositories later.
@@ -216,7 +222,8 @@ Why:
 
 - users often need to know not only which keys were added or removed, but which
   fields changed for matching keys;
-- this is clearly outside exact presence comparison;
+- `uniqdiff` now provides the engine primitive, while the product workflow still
+  belongs outside the core package;
 - it creates immediate value for CSV/JSONL workflows;
 - it can reuse `uniqdiff` for key presence and duplicate checks;
 - it can later feed `uniqreport`.

@@ -1,6 +1,6 @@
 # Public API Boundary
 
-This page defines the public module boundary for `uniqdiff` 1.0.
+This page defines the public module boundary for `uniqdiff` 1.x.
 
 The preferred public import path is the root package:
 
@@ -10,7 +10,7 @@ from uniqdiff import compare, CompareResult, iter_result_values
 
 ## Stable Root Exports
 
-The following names are part of the 1.0 engine contract:
+The following names are part of the 1.x engine contract:
 
 - `compare`;
 - `diff`;
@@ -25,6 +25,13 @@ The following names are part of the 1.0 engine contract:
 - `compare_files`;
 - `compare_sources`;
 - `duplicates_source`;
+- `compare_fields`;
+- `compare_fields_files`;
+- `compare_file_fields`;
+- `iter_field_diff_rows`;
+- `infer_schema`;
+- `compare_schema`;
+- `compare_file_schema`;
 - `CompareResult`;
 - `CompareStats`;
 - `iter_result_rows`;
@@ -36,7 +43,7 @@ The following names are part of the 1.0 engine contract:
 - built-in local connectors;
 - documented exception classes.
 
-These names should not be removed or renamed in a minor release after 1.0.
+These names should not be removed or renamed in a minor release.
 
 ## Public Modules
 
@@ -48,6 +55,8 @@ These modules may be imported directly when users need a narrower namespace:
 - `uniqdiff.normalizers`: built-in normalizer helpers;
 - `uniqdiff.output`: lazy result readers;
 - `uniqdiff.result`: result dataclasses;
+- `uniqdiff.fields`: field-level diff dataclasses and helpers;
+- `uniqdiff.schema`: schema inference and schema diff dataclasses and helpers;
 - `uniqdiff.io`: low-level local file readers;
 - `uniqdiff.bloom`: probabilistic helper API;
 - `uniqdiff.fuzzy`: approximate string helper API.
@@ -58,7 +67,7 @@ probabilistic or approximate.
 
 ## Internal Modules
 
-These modules are implementation details and are not covered by the 1.0 compatibility
+These modules are implementation details and are not covered by the 1.x compatibility
 contract:
 
 - modules whose name starts with `_`, such as `uniqdiff._utils` and `uniqdiff._typing`;
@@ -75,6 +84,6 @@ documented wrapper through the public facade instead of importing the internal m
 
 ## Compatibility Rule
 
-After 1.0, compatibility is defined by documented behavior, root exports, result
-schemas, CLI contracts, and documented module APIs. Internal modules may change in
-minor releases as long as the public engine contract remains stable.
+Compatibility is defined by documented behavior, root exports, result schemas, CLI
+contracts, and documented module APIs. Internal modules may change in minor releases
+as long as the public engine contract remains stable.

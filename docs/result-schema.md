@@ -1,6 +1,6 @@
 # Result Schema
 
-This page documents the stable result schema for `uniqdiff` 1.0.
+This page documents the stable result schema for `uniqdiff` 1.x.
 
 ## `CompareResult`
 

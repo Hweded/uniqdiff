@@ -3,8 +3,8 @@
 This document fixes `uniqdiff` as the stable comparison engine for the UniqTools
 ecosystem.
 
-`uniqdiff` is not intended to contain all product logic. It provides the exact
-comparison layer that other tools can safely build on top of.
+`uniqdiff` is not intended to contain all product logic. It provides the comparison
+engine layer that other tools can safely build on top of.
 
 ## Ecosystem Role
 
@@ -141,6 +141,21 @@ Stable result modes:
 
 `result_mode="file"` is the engine-level path for large diff output.
 
+### 1.1-Pre Engine Additions
+
+The current 1.x development branch also exposes documented engine primitives for:
+
+- sorted streaming diff through `iter_sorted_diff()`, `compare_sorted_iter()`,
+  `write_sorted_diff()`, and `write_sorted_diff_file()`;
+- field-level diff by key through `compare_fields()`, `compare_fields_files()`,
+  `compare_file_fields()`, and `iter_field_diff_rows()`;
+- schema-aware diff through `infer_schema()`, `compare_schema()`, and
+  `compare_file_schema()`.
+
+These APIs are engine primitives. They return structured facts and streaming files;
+they do not add reports, workflow orchestration, or data quality policy logic to
+`uniqdiff`.
+
 ### CLI
 
 Stable CLI commands:
@@ -175,7 +190,7 @@ The following must not be added to `uniqdiff` core:
 - HTML/PDF/Excel reports;
 - business reports;
 - data cleaning;
-- schema validation;
+- schema validation policies and rule sets;
 - workflow YAML runner;
 - full data quality rule engine;
 - dashboards;
@@ -199,6 +214,9 @@ The current codebase already includes:
 - auto mode;
 - file result mode;
 - lazy result readers;
+- sorted streaming diff;
+- field-level diff by key;
+- schema-aware diff;
 - connector registry;
 - local file connectors;
 - TSV and gzip support;
@@ -212,15 +230,14 @@ The current codebase already includes:
 - linting;
 - build checks.
 
-Therefore, `uniqdiff` should be treated as a stable 1.0 exact comparison engine, not
-an early exploratory project.
+Therefore, `uniqdiff` should be treated as a stable 1.x comparison engine, not an
+early exploratory project.
 
 ## 1.0 Release Principle
 
 The 1.0 release should be framed as:
 
-> `uniqdiff` is a stable exact comparison engine for Python and the UniqTools
-> ecosystem.
+> `uniqdiff` is a stable comparison engine for Python and the UniqTools ecosystem.
 
 It should not be framed as:
 

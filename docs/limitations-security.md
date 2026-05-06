@@ -32,6 +32,23 @@ If writing fails, the final output path is not replaced.
 The stable row schema is `section` and `value`. Consumers should ignore unknown future
 metadata fields, but should treat row schema changes as breaking changes.
 
+## Field Diff
+
+Field diff indexes the second input by key. If duplicate keys appear in the second
+input, the first row for that key is used for comparison and later rows are counted in
+`metadata["duplicate_second_key_count"]`.
+
+Use `columns` or `exclude_columns` to keep large row comparisons focused. Streaming
+field-diff output is JSONL-only so large changed-row outputs can be consumed lazily.
+
+## Schema Diff
+
+Schema inference is based on observed values. It is not a database DDL parser and it
+does not enforce schema validation policies.
+
+Use `sample_size` for faster checks on large files, but treat sampled schema results
+as approximate observations of the inspected rows.
+
 ## Fuzzy and Probabilistic Features
 
 Fuzzy matching and Bloom filters are public helper APIs, but they are not part of the

@@ -50,7 +50,10 @@ This directory contains project documentation for users and maintainers.
 - SQLite backend for simple disk-backed exact comparison;
 - hash partitioning backend for partition-by-partition processing;
 - external sort backend for sorted chunk and merge processing;
-- file result mode for large result sets.
+- file result mode for large result sets;
+- sorted streaming diff for already sorted inputs;
+- field-level diff by key with JSONL streaming output;
+- schema-aware diff for added/removed columns, type changes, and nullable changes;
 - connector API for pluggable sources;
 - fuzzy string comparison as an approximate helper outside the exact engine;
 - Bloom filter candidate filtering as a probabilistic helper outside the exact engine.
@@ -58,5 +61,6 @@ This directory contains project documentation for users and maintainers.
 ## Release Readiness
 
 The project now includes documentation for practical usage recipes, backend behavior,
-migration guidance, and backward compatibility policy. These pages define the path to
-a stable 1.0 release.
+migration guidance, and backward compatibility policy. The 1.0 engine contract is
+documented, and current documentation also covers the 1.1-pre field/schema diff
+surface.

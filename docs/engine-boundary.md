@@ -19,6 +19,8 @@ logic.
 - memory, SQLite, hash partitioning, external sort, and auto backend selection;
 - memory and file result modes;
 - stable result objects and lazy result readers;
+- engine-level field diff by key;
+- engine-level schema inference and schema diff;
 - the connector protocol and built-in local connectors;
 - a direct CLI for engine-level comparison tasks.
 
@@ -27,7 +29,7 @@ logic.
 `uniqdiff` should not own:
 
 - HTML, PDF, Excel, or business reports;
-- schema validation;
+- schema validation policies and rule sets;
 - data quality rule engines;
 - data cleaning workflows;
 - YAML workflow runners;
@@ -37,7 +39,9 @@ logic.
 - heavy cloud/database integrations in the core package.
 
 These belong in higher-level packages such as `uniqreport`, `uniqschema`,
-`uniqcheck`, `uniqrowdiff`, and `uniqtools-cli`.
+`uniqcheck`, `uniqrowdiff`, and `uniqtools-cli`. `uniqdiff` may expose primitive
+field/schema facts, but product workflows, reports, policies, and user-facing
+templates stay outside the engine.
 
 ## Public Extension Points
 
@@ -60,7 +64,8 @@ The internal engine is intentionally split into small layers:
 - `planner`: mode normalization, auto-mode decision metadata, and backend selection;
 - `storage`: memory and disk-backed exact comparison backends;
 - `connectors`: source adapters and the connector registry;
-- `output`: file result writing and lazy result readers.
+- `output`: file result writing and lazy result readers;
+- `fields` and `schema`: engine-level structured diff primitives.
 
 Only documented public APIs are covered by the compatibility contract. These internal
 modules exist to keep the engine maintainable and may evolve between minor releases.
