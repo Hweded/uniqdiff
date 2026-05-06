@@ -88,3 +88,71 @@ row field names or the meaning of existing sections is a breaking change.
 `iter_result_values(path, sections=None)` yields only `value`.
 
 These helpers are the stable way to consume large file-backed outputs.
+
+## Field Diff Result
+
+`compare_fields()`, `compare_fields_files()`, and `compare_file_fields()` return
+`FieldDiffResult`.
+
+Stable fields:
+
+- `rows`: changed rows when output is kept in memory;
+- `summary_by_column`: changed-field counts by column name;
+- `stats`: `FieldDiffStats`;
+- `metadata`: field-diff metadata;
+- `warnings`: warning strings.
+
+When `output` is provided, changed rows are streamed to JSONL and `rows` stays
+empty. Stats and summary are still returned in memory.
+
+## `FieldDiffStats`
+
+Stable counter fields:
+
+- `first_count`;
+- `second_count`;
+- `compared_count`;
+- `changed_row_count`;
+- `changed_field_count`;
+- `emitted_row_count`;
+- `output_bytes`;
+- `truncated`.
+
+`changed_row_count` counts all changed matching-key rows found. `emitted_row_count`
+counts rows actually written or stored after `max_rows` / `max_bytes` limits.
+
+## Field Diff JSONL Rows
+
+Field-diff JSONL output contains one changed keyed row per line.
+
+Stable fields:
+
+- `key`: comparison key value;
+- `changes`: list of changed fields.
+
+Each item in `changes` has:
+
+- `field`;
+- `left`;
+- `right`.
+
+Example:
+
+```json
+{"key":"123","changes":[{"field":"status","left":"draft","right":"active"}]}
+```
+
+`iter_field_diff_rows(path)` is the stable lazy reader for field-diff JSONL output.
+
+## Field Diff Duplicate Key Behavior
+
+Field diff indexes the second input by key. If the second input contains duplicate
+keys, the first row for that key is used and later rows are ignored for field
+comparison.
+
+This behavior is surfaced through:
+
+- `metadata["duplicate_second_key_count"]`;
+- a warning when the count is greater than zero.
+
+Changing this default behavior would be a compatibility-affecting change.

@@ -86,6 +86,15 @@ Parquet inputs follow the same reader options as `compare_files()`.
 
 Alias-style public facade for file-oriented field comparison.
 
+## `iter_field_diff_rows(output)`
+
+Lazily reads JSONL rows produced by field-level diff streaming output.
+
+Each yielded row contains:
+
+- `key`;
+- `changes`.
+
 ## `infer_schema(rows, ...)`
 
 Infers column names, observed value types, and nullability from structured rows.

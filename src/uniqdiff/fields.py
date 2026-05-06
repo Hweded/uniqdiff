@@ -6,7 +6,7 @@ import json
 import os
 import tempfile
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 from typing import Any, Optional, Union
@@ -20,6 +20,9 @@ from uniqdiff.tokens import extract_key
 
 _NO_OUTPUT_WARNING = "Field diff rows were streamed to output and are not materialized."
 _TRUNCATED_WARNING = "Field diff output was truncated by max_rows or max_bytes."
+_DUPLICATE_RIGHT_KEY_WARNING = (
+    "Duplicate keys were found in the second input; only the first row per key was used."
+)
 
 
 @dataclass(frozen=True)
@@ -111,14 +114,14 @@ def compare_fields(
         max_rows=max_rows,
         max_bytes=max_bytes,
     )
-    right_by_key, second_count = _index_rows_by_key(second, key=key)
+    right_index = _index_rows_by_key(second, key=key)
     accumulator = _FieldDiffAccumulator()
 
     with _JSONLFieldWriter.open_optional(output, max_bytes=config.max_bytes) as writer:
         for left_row in first:
             accumulator.first_count += 1
             token = extract_key(left_row, key)
-            right_row = right_by_key.get(token)
+            right_row = right_index.rows.get(token)
             if right_row is None:
                 continue
 
@@ -151,12 +154,28 @@ def compare_fields(
 
     return _build_result(
         accumulator,
-        second_count=second_count,
+        right_index=right_index,
         key=key,
         columns=columns,
         exclude_columns=exclude_columns,
         output=output,
     )
+
+
+def iter_field_diff_rows(output: Union[str, os.PathLike[str]]) -> Iterator[dict[str, Any]]:
+    """Yield field-diff rows lazily from a JSONL field diff output file."""
+
+    output_path = Path(output)
+    if output_path.suffix.lower() != ".jsonl":
+        raise InvalidInputError("field diff lazy reading supports only .jsonl output")
+    with output_path.open("r", encoding="utf-8") as file:
+        for line in file:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if not isinstance(row, dict):
+                raise InvalidInputError("field diff JSONL row must be an object")
+            yield row
 
 
 def compare_fields_files(
@@ -262,6 +281,13 @@ class _FieldDiffAccumulator:
         return max_rows is None or self.emitted_row_count < max_rows
 
 
+@dataclass(frozen=True)
+class _KeyIndex:
+    rows: dict[Any, Any]
+    count: int
+    duplicate_key_count: int
+
+
 def _build_config(
     *,
     key: KeySpec,
@@ -285,20 +311,24 @@ def _build_config(
     )
 
 
-def _index_rows_by_key(rows: Iterable[Any], *, key: KeySpec) -> tuple[dict[Any, Any], int]:
+def _index_rows_by_key(rows: Iterable[Any], *, key: KeySpec) -> _KeyIndex:
     indexed: dict[Any, Any] = {}
     count = 0
+    duplicate_key_count = 0
     for row in rows:
         token = extract_key(row, key)
-        indexed.setdefault(token, row)
+        if token in indexed:
+            duplicate_key_count += 1
+        else:
+            indexed[token] = row
         count += 1
-    return indexed, count
+    return _KeyIndex(rows=indexed, count=count, duplicate_key_count=duplicate_key_count)
 
 
 def _build_result(
     accumulator: _FieldDiffAccumulator,
     *,
-    second_count: int,
+    right_index: _KeyIndex,
     key: KeySpec,
     columns: Optional[Sequence[str]],
     exclude_columns: Optional[Sequence[str]],
@@ -306,7 +336,7 @@ def _build_result(
 ) -> FieldDiffResult:
     stats = FieldDiffStats(
         first_count=accumulator.first_count,
-        second_count=second_count,
+        second_count=right_index.count,
         compared_count=accumulator.compared_count,
         changed_row_count=accumulator.changed_row_count,
         changed_field_count=accumulator.changed_field_count,
@@ -314,7 +344,11 @@ def _build_result(
         output_bytes=accumulator.output_bytes,
         truncated=accumulator.truncated,
     )
-    warnings = _result_warnings(output=output, truncated=accumulator.truncated)
+    warnings = _result_warnings(
+        output=output,
+        truncated=accumulator.truncated,
+        duplicate_right_key_count=right_index.duplicate_key_count,
+    )
     return FieldDiffResult(
         rows=accumulator.rows,
         summary_by_column=dict(accumulator.summary),
@@ -325,6 +359,7 @@ def _build_result(
             "exclude_columns": list(exclude_columns) if exclude_columns is not None else None,
             "output": str(output) if output is not None else None,
             "result_mode": "file" if output is not None else "memory",
+            "duplicate_second_key_count": right_index.duplicate_key_count,
         },
         warnings=warnings,
     )
@@ -334,12 +369,15 @@ def _result_warnings(
     *,
     output: Optional[Union[str, os.PathLike[str]]],
     truncated: bool,
+    duplicate_right_key_count: int,
 ) -> list[str]:
     warnings = []
     if output is not None:
         warnings.append(_NO_OUTPUT_WARNING)
     if truncated:
         warnings.append(_TRUNCATED_WARNING)
+    if duplicate_right_key_count:
+        warnings.append(_DUPLICATE_RIGHT_KEY_WARNING)
     return warnings
 
 

@@ -50,7 +50,7 @@ from uniqdiff.exceptions import (
     UniqDiffError,
     UnsupportedFormatError,
 )
-from uniqdiff.fields import FieldChange, FieldDiffResult, FieldDiffStats
+from uniqdiff.fields import FieldChange, FieldDiffResult, FieldDiffStats, iter_field_diff_rows
 from uniqdiff.fuzzy import compare_fuzzy_strings
 from uniqdiff.normalizers import compose_normalizers, string_normalizer
 from uniqdiff.output import iter_result_rows, iter_result_values
@@ -112,6 +112,7 @@ __all__ = [
     "intersection",
     "iter_result_rows",
     "iter_result_values",
+    "iter_field_diff_rows",
     "iter_sorted_diff",
     "list_connectors",
     "probabilistic_diff_candidates",

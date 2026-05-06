@@ -23,6 +23,8 @@
   JSONL streaming output, max row/byte limits, public APIs, and CLI flags.
 - Added schema-aware diff for inferred columns, value types, nullability, file
   inputs, CLI summary output, and CI exit-code support.
+- Added lazy reading for field-diff JSONL output and explicit duplicate-key
+  metadata/warnings for the indexed second input.
 
 ## 1.0.0
 

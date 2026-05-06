@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from uniqdiff import compare_fields, compare_fields_files
+from uniqdiff import compare_fields, compare_fields_files, iter_field_diff_rows
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -65,6 +65,27 @@ def test_compare_fields_streams_jsonl_and_applies_row_limit():
     assert rows == [{"key": 1, "changes": [{"field": "name", "left": "a", "right": "x"}]}]
 
 
+def test_iter_field_diff_rows_reads_streamed_jsonl_lazily():
+    output = FIXTURES / "field-diff-lazy.jsonl"
+    output.unlink(missing_ok=True)
+    try:
+        compare_fields(
+            [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}],
+            [{"id": 1, "name": "x"}, {"id": 2, "name": "y"}],
+            key="id",
+            output=output,
+        )
+
+        rows = list(iter_field_diff_rows(output))
+    finally:
+        output.unlink(missing_ok=True)
+
+    assert rows == [
+        {"key": 1, "changes": [{"field": "name", "left": "a", "right": "x"}]},
+        {"key": 2, "changes": [{"field": "name", "left": "b", "right": "y"}]},
+    ]
+
+
 def test_compare_fields_streaming_respects_max_bytes():
     output = FIXTURES / "field-diff-max-bytes.jsonl"
     output.unlink(missing_ok=True)
@@ -107,3 +128,19 @@ def test_compare_fields_files_reads_csv_and_filters_columns():
         {"key": "1", "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]}
     ]
     assert result.summary_by_column == {"name": 1}
+
+
+def test_compare_fields_reports_duplicate_keys_in_second_input():
+    result = compare_fields(
+        [{"id": 1, "name": "Ann"}],
+        [{"id": 1, "name": "Anne"}, {"id": 1, "name": "Annie"}],
+        key="id",
+    )
+
+    assert result.rows == [
+        {"key": 1, "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]}
+    ]
+    assert result.metadata["duplicate_second_key_count"] == 1
+    assert result.warnings == [
+        "Duplicate keys were found in the second input; only the first row per key was used."
+    ]
