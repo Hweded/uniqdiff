@@ -1,402 +1,391 @@
 # uniqdiff
 
-`uniqdiff` is a stable comparison engine foundation for Python projects and the
-UniqTools ecosystem. It compares datasets, files, streams, and connector-backed
-sources, then returns exact unique differences, intersections, duplicates, result
-metadata, and comparison statistics.
+Data diff engine for CSV, Parquet, JSONL, streams, and large dataset comparison.
 
-Its purpose is to provide stable exact comparison semantics, token extraction,
-backends, result objects, lazy result readers, connectors, and a direct CLI.
-Product-layer features such as reports, schema validation, data quality rules,
-dashboards, and workflow orchestration belong in higher-level UniqTools packages.
+`uniqdiff` tells you what changed between two datasets:
 
-## Installation
+- rows only in the old dataset;
+- rows only in the new dataset;
+- rows present in both datasets;
+- changed fields for rows with the same key;
+- schema drift: added/removed columns, type changes, nullable changes.
+
+It is built for data engineers, backend engineers, ETL pipelines, and data QA jobs
+that need repeatable diffs without writing pandas merge code or DuckDB SQL.
 
 ```bash
 pip install uniqdiff
+uniqdiff diff old.csv new.csv --format csv --key id --summary
 ```
 
-Install optional Parquet support:
+## Why uniqdiff
+
+- **Less memory than pandas for large diffs**: use disk-backed and file-result modes.
+- **Simpler than DuckDB for comparison jobs**: no SQL required.
+- **More scalable than csv-diff for large outputs**: stream JSONL/CSV result rows.
+- **Engine-first API**: use it from Python, CLI, CI, ETL, or other tools.
+- **No heavy required dependencies**: core uses the Python standard library.
+
+Use `uniqdiff` when you need a focused comparison engine, not a dataframe framework,
+SQL database, or report generator.
+
+## Quick start
+
+Create two files:
+
+```bash
+python -c "from pathlib import Path; Path('old.csv').write_text('id,name,status\n1,Alice,active\n2,Bob,pending\n3,Cara,active\n', encoding='utf-8'); Path('new.csv').write_text('id,name,status\n2,Bob,active\n3,Cara,active\n4,Dana,pending\n', encoding='utf-8')"
+```
+
+Install and compare:
+
+```bash
+pip install uniqdiff
+uniqdiff diff old.csv new.csv --format csv --key id --summary
+```
+
+Find changed fields for matching keys:
+
+```bash
+uniqdiff diff old.csv new.csv --format csv --key id --field-diff
+```
+
+Check schema drift:
+
+```bash
+uniqdiff diff old.csv new.csv --format csv --schema-diff --summary
+```
+
+Use from Python:
+
+```python
+from uniqdiff import compare
+
+result = compare(
+    [{"id": 1}, {"id": 2}],
+    [{"id": 2}, {"id": 3}],
+    key="id",
+    include_common=True,
+)
+
+print(result.only_in_first)   # [{"id": 1}]
+print(result.only_in_second)  # [{"id": 3}]
+print(result.common)          # [{"id": 2}]
+```
+
+## Example output
+
+CLI summary:
+
+```json
+{
+  "equal": false,
+  "only_in_first_count": 1,
+  "only_in_second_count": 1,
+  "common_count": 2,
+  "duplicate_first_count": 0,
+  "duplicate_second_count": 0,
+  "backend": "memory",
+  "result_mode": "memory"
+}
+```
+
+Field-level diff:
+
+```json
+{
+  "rows": [
+    {
+      "key": "2",
+      "changes": [
+        {
+          "field": "status",
+          "left": "pending",
+          "right": "active"
+        }
+      ]
+    }
+  ],
+  "summary_by_column": {
+    "status": 1
+  }
+}
+```
+
+Streaming JSONL output for large diffs:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --key id \
+  --mode disk \
+  --result-mode file \
+  --output diff.jsonl
+```
+
+Example JSONL rows:
+
+```jsonl
+{"section":"only_in_first","value":{"id":"1","name":"Alice","status":"active"}}
+{"section":"only_in_second","value":{"id":"4","name":"Dana","status":"pending"}}
+```
+
+## Use cases
+
+- Compare daily CSV exports.
+- Detect added and removed records by primary key.
+- Compare Parquet snapshots in ETL pipelines.
+- Catch row-level changes before loading data downstream.
+- Detect schema drift in CI.
+- Stream large diff outputs to JSONL for later processing.
+- Validate backend service exports against expected data.
+- Build data QA tools on top of a stable comparison engine.
+
+## Benchmarks
+
+These are real local benchmark runs from this repository using
+`benchmarks/run.py`. Results depend on CPU, disk, Python version, input shape,
+overlap, and output size.
+
+Verification commands run before updating this README:
+
+```bash
+python -m ruff check .
+python -m mypy src
+python -m pytest tests -q
+```
+
+Result:
+
+```text
+ruff: All checks passed
+mypy: Success, no issues found in 32 source files
+pytest: full test suite passed, 2 optional tests skipped
+```
+
+Scalar keyed diff, `100_000` rows per input, `50%` overlap:
+
+```bash
+python benchmarks/run.py \
+  --size 100000 \
+  --chunk-size 50000 \
+  --scenario memory \
+  --scenario sqlite \
+  --scenario file_result \
+  --json
+```
+
+| Scenario | Backend | Time | Peak memory | Rows only in left | Rows only in right | Common | Output |
+|---|---|---:|---:|---:|---:|---:|---:|
+| memory | memory | 0.085s | 13.308 MB | 50,000 | 50,000 | 50,000 | 0 MB |
+| sqlite | sqlite | 3.177s | 9.206 MB | 50,000 | 50,000 | 50,000 | 0 MB |
+| file_result | sqlite | 4.360s | 9.202 MB | 50,000 | 50,000 | 50,000 | 5.759 MB |
+
+Dictionary row diff by `id`, `50_000` rows per input, `50%` overlap:
+
+```bash
+python benchmarks/run.py \
+  --size 50000 \
+  --data-shape dict \
+  --chunk-size 25000 \
+  --scenario memory \
+  --scenario sqlite \
+  --scenario file_result \
+  --json
+```
+
+| Scenario | Backend | Time | Peak memory | Rows only in left | Rows only in right | Common | Output |
+|---|---|---:|---:|---:|---:|---:|---:|
+| memory | memory | 0.063s | 6.638 MB | 25,000 | 25,000 | 25,000 | 0 MB |
+| sqlite | sqlite | 3.123s | 26.818 MB | 25,000 | 25,000 | 25,000 | 0 MB |
+| file_result | sqlite | 5.584s | 26.589 MB | 25,000 | 25,000 | 25,000 | 5.057 MB |
+
+What the numbers show:
+
+- memory mode is fastest when data fits comfortably in RAM;
+- disk mode trades speed for bounded materialization and file-backed workflows;
+- file-result mode handles large outputs without keeping result rows in memory;
+- benchmark runs are reproducible with stdlib-only tooling.
+
+Cross-tool benchmarks are available separately:
+
+```bash
+pip install -e ".[benchmark]"
+python benchmarks/comparison/run.py --rows 10000
+```
+
+The comparison suite reports fit-by-use-case labels for pandas, DuckDB,
+csv-diff/csvdiff-style workflows, DataComPy, and `uniqdiff`.
+
+## Features
+
+- Exact row presence diff:
+  - `only_in_first`
+  - `only_in_second`
+  - `common`
+  - `unique`
+- Duplicate detection.
+- Comparison by key or composite key.
+- Field-level diff by key.
+- Schema-aware diff:
+  - added columns;
+  - removed columns;
+  - type changes;
+  - nullable changes.
+- CSV, TSV, JSONL, TXT, gzip, and optional Parquet.
+- Streaming sorted diff for already sorted inputs.
+- Memory, SQLite, hash partition, external sort, and auto modes.
+- File-result mode for JSONL/CSV output.
+- Lazy readers for large result files.
+- CLI with `--summary` and `--fail-on-diff`.
+- Type hints and stable result objects.
+
+## Usage
+
+Compare files:
+
+```bash
+uniqdiff diff old.csv new.csv --format csv --key id
+```
+
+Compact CI output:
+
+```bash
+uniqdiff diff expected.csv actual.csv \
+  --format csv \
+  --key id \
+  --summary \
+  --fail-on-diff
+```
+
+Field-level diff:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --key id \
+  --field-diff \
+  --columns name,status,email \
+  --summary
+```
+
+Schema diff:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --schema-diff \
+  --summary \
+  --fail-on-diff
+```
+
+Large output:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --key id \
+  --mode disk \
+  --result-mode file \
+  --output diff.jsonl
+```
+
+Python API:
+
+```python
+from uniqdiff import compare_files, compare_fields, compare_file_schema
+
+rows = compare_files("old.csv", "new.csv", format="csv", key="id")
+fields = compare_fields(old_rows, new_rows, key="id", columns=("status",))
+schema = compare_file_schema("old.csv", "new.csv", format="csv")
+```
+
+Parquet:
 
 ```bash
 pip install "uniqdiff[parquet]"
 ```
 
-For local development:
-
-```bash
-pip install -e ".[dev]"
-```
-
-## Documentation
-
-Key guides:
-
-- [Recipes](docs/recipes.md)
-- [Stable Engine Contract](docs/stable-engine-contract.md)
-- [Engine Boundary](docs/engine-boundary.md)
-- [Public API Boundary](docs/public-api.md)
-- [API Reference](docs/api-reference.md)
-- [Result Schema](docs/result-schema.md)
-- [Backend Behavior](docs/backend-behavior.md)
-- [Connectors](docs/connectors.md)
-- [CLI](docs/cli.md)
-- [Migration Guide](docs/migration-guide.md)
-- [Backward Compatibility](docs/backward-compatibility.md)
-
-Project files:
-
-- [License](LICENSE)
-- [Commercial Support](COMMERCIAL.md)
-- [Support](SUPPORT.md)
-- [Services](SERVICES.md)
-
-## Quick Start
-
-```python
-from uniqdiff import compare
-
-result = compare([1, 2, 3], [3, 4, 5], include_common=True)
-
-print(result.only_in_first)   # [1, 2]
-print(result.only_in_second)  # [4, 5]
-print(result.common)          # [3]
-print(result.unique)          # [1, 2, 4, 5]
-```
-
-## Compare Dictionaries By Key
-
-```python
-from uniqdiff import compare_by_key
-
-old = [{"id": 1, "name": "Ann"}, {"id": 2, "name": "Bob"}]
-new = [{"id": 2, "name": "Bob"}, {"id": 3, "name": "Cara"}]
-
-result = compare_by_key(old, new, key="id")
-
-assert result.only_in_first == [{"id": 1, "name": "Ann"}]
-assert result.only_in_second == [{"id": 3, "name": "Cara"}]
-```
-
-## Normalization
-
-```python
-from uniqdiff import compare, string_normalizer
-
-normalizer = string_normalizer(lower=True, strip=True, remove_spaces=True)
-result = compare([" Alice ", "Bob"], ["alice", "Cara"], normalizer=normalizer)
-```
-
-## File Comparison
-
 ```python
 from uniqdiff import compare_files
 
-result = compare_files("old.csv", "new.csv", key="id", format="csv")
-result = compare_files("old.csv", "new.csv", key="id", format="csv", delimiter=";")
-result = compare_files("old.parquet", "new.parquet", key="id", columns=("id", "name"))
-```
-
-Supported formats:
-
-- `csv`
-- `tsv`
-- `jsonl`
-- `parquet` with `uniqdiff[parquet]`
-- `txt`
-- gzip-compressed variants such as `.csv.gz`, `.tsv.gz`, `.jsonl.gz`, and `.txt.gz`
-
-## Connectors
-
-Connectors provide a small extension layer for reading data sources. Built-ins cover
-iterables and local files:
-
-```python
-from uniqdiff import compare_sources
-
-result = compare_sources(
-    "old.csv",
-    "new.csv",
-    first_kind="csv",
-    second_kind="csv",
+result = compare_files(
+    "old.parquet",
+    "new.parquet",
+    format="parquet",
     key="id",
+    columns=("id", "status"),
 )
 ```
 
-Registered connector names:
+## Comparison
 
-- `iterable`
-- `file`
-- `csv`
-- `tsv`
-- `tab`
-- `jsonl`
-- `parquet`
-- `pq`
-- `txt`
-- `text`
+| Need | uniqdiff | pandas | DuckDB | csv-diff |
+|---|---|---|---|---|
+| Simple keyed row diff | Built in | Custom merge code | SQL query | Built in |
+| Field-level diff | Built in | Custom code | SQL/custom code | Partial |
+| Schema drift check | Built in | Custom code | SQL/custom code | No |
+| Low-memory output | JSONL/CSV streaming | Manual | Possible with SQL/export | Limited |
+| No SQL required | Yes | Yes | No | Yes |
+| Parquet support | Optional extra | Yes | Yes | No/limited |
+| CI-friendly CLI | Yes | No | Partial | Yes |
+| Large output handling | Designed for file-result mode | Often materialized | Good with query design | Less scalable |
 
-Custom connectors implement `open()` and `describe()` and can be registered with
-`register_connector`.
+Choose `uniqdiff` when the job is comparison.
 
-CSV and TSV connectors support dialect options such as `delimiter`, `quotechar`,
-`has_header`, and `fieldnames`.
+Choose pandas when the job is dataframe transformation.
 
-Parquet support is optional and uses `pyarrow`. Install it with `uniqdiff[parquet]`.
-The Parquet connector supports `columns` and `batch_size`.
+Choose DuckDB when the team wants SQL and query planning.
 
-## Disk Mode
+Choose csv-diff for small CSV-only diffs.
 
-`mode="disk"` uses a temporary SQLite database from the Python standard library.
-Input iterables are consumed incrementally and indexed on disk, which is useful when
-the input data should not be fully materialized as Python sets.
+## How it works
 
-```python
-from uniqdiff import compare
+`uniqdiff` is an engine layer:
 
-result = compare(
-    stream_a,
-    stream_b,
-    key="id",
-    mode="disk",
-    disk_strategy="sqlite",
-    chunk_size=100_000,
-    temp_dir="./tmp",
-    disk_limit="10GB",
-)
+```text
+input source
+  -> reader / connector
+  -> key extraction and normalization
+  -> backend selection
+  -> exact comparison
+  -> memory result or streaming file result
 ```
 
-`mode="auto"` uses a small, predictable heuristic:
+Backends:
 
-- `result_mode="file"` chooses disk mode;
-- `temp_dir` chooses disk mode;
-- `memory_limit` is compared with an estimated input size;
-- unsized iterables/generators choose disk mode when `memory_limit` is set;
-- otherwise auto keeps the memory backend.
+- `memory`: fastest path for small and medium datasets.
+- `sqlite`: disk-backed exact comparison with no optional dependency.
+- `hash_partition`: splits data into hash partitions for large comparisons.
+- `external_sort`: sorts chunks on disk and merges token streams.
+- `auto`: chooses a backend from input/options metadata.
 
-The current size estimate for sized inputs is intentionally conservative and simple:
-`len(first) + len(second)` multiplied by an internal per-item estimate. The decision is
-stored in `result.metadata["auto_decision"]`.
+Result modes:
 
-```python
-result = compare(
-    rows_a,
-    rows_b,
-    mode="auto",
-    memory_limit="512MB",
-)
+- `memory`: returns Python result objects.
+- `file`: streams JSONL/CSV output and returns stats/metadata.
 
-print(result.metadata["backend"])
-print(result.metadata["auto_decision"])
-```
+Engine boundaries:
 
-For very large inputs, hash partitioning can reduce peak memory by comparing one
-partition at a time. It is a stable 1.0 backend documented as an advanced mode because
-partition count, key skew, and temporary disk usage matter:
+- `uniqdiff` does comparison.
+- Reports, dashboards, workflow orchestration, cloud connector management, and
+  business rules belong in higher-level tools such as UniqTools.
 
-```python
-result = compare(
-    stream_a,
-    stream_b,
-    key="id",
-    mode="disk",
-    disk_strategy="hash_partition",
-    partition_count=128,
-    temp_dir="./tmp",
-)
-```
+## Limitations
 
-Hash partitioning writes temporary partition files and guarantees that equal comparison
-tokens are processed in the same partition.
+- Memory mode is fastest but requires data/results to fit in RAM.
+- Disk mode is slower because it uses temporary storage.
+- File-result mode avoids materializing output rows, but output size still affects runtime.
+- Field-level diff currently indexes the second input by key.
+- Schema inference is based on observed values, not database DDL.
+- Parquet requires `pyarrow` via `uniqdiff[parquet]`.
+- Fuzzy matching and Bloom filters are helper APIs, not replacements for exact diff.
+- Benchmark results are workload-dependent; run the included benchmark suite on your data shape.
 
-External sort is also available when sorted chunk files are a better fit than
-partition files. It is also a stable 1.0 backend documented as an advanced mode:
+## Call to action
 
-```python
-result = compare(
-    stream_a,
-    stream_b,
-    key="id",
-    mode="disk",
-    disk_strategy="external_sort",
-    chunk_size=250_000,
-    temp_dir="./tmp",
-)
-```
+If `uniqdiff` helps you compare datasets with less code and safer memory behavior,
+star the repository.
 
-This backend sorts each chunk on disk, performs a merge pass over both sorted token
-streams, and emits each result section in original input order for that side. Ordering
-is still not part of the cross-backend semantic contract.
-
-## File Result Mode
-
-For large outputs, use `result_mode="file"` with `.jsonl` or `.csv` output. In this
-mode, result rows are written to disk and are not materialized in `CompareResult`.
-Statistics and metadata are still returned.
-
-```python
-result = compare(
-    stream_a,
-    stream_b,
-    key="id",
-    mode="disk",
-    disk_strategy="sqlite",
-    result_mode="file",
-    output="diff.jsonl",
-)
-
-print(result.stats.only_in_first_count)
-print(result.metadata["output"])
-```
-
-Read large result files lazily:
-
-```python
-from uniqdiff import iter_result_values
-
-for value in iter_result_values("diff.jsonl", sections=("only_in_first",)):
-    print(value)
-```
-
-File-backed `CompareResult` objects can also stream values:
-
-```python
-for value in result.iter_unique():
-    print(value)
-```
-
-Each JSONL/CSV row contains:
-
-- `section`: `only_in_first`, `only_in_second`, `common`, `duplicates_first`, or `duplicates_second`;
-- `value`: the original item.
-
-## CLI
-
-After installation, `uniqdiff` can compare files from the command line:
-
-```bash
-uniqdiff compare old.csv new.csv --format csv --key id
-uniqdiff compare old.csv new.csv --format csv --key id --summary
-uniqdiff diff old.csv new.csv --format csv --key id --summary --fail-on-diff
-uniqdiff compare old.csv new.csv --format csv --key id --mode disk --disk-strategy hash-partition
-uniqdiff compare old.csv new.csv --format csv --key id --mode disk --disk-strategy external-sort
-uniqdiff compare old.csv new.csv --format csv --key id --mode disk --result-mode file --output diff.jsonl
-uniqdiff diff old.txt new.txt --format txt --output result.json
-uniqdiff intersection old.jsonl new.jsonl --format jsonl --key id
-uniqdiff duplicates users.csv --format csv --key email
-```
-
-Useful CI flags:
-
-- `--summary`: print compact counters instead of full result rows;
-- `--fail-on-diff`: return exit code `1` when `compare`/`diff` find differences or `duplicates` finds duplicates.
-
-Common options:
-
-- `--mode memory|disk|auto`
-- `--chunk-size 100000`
-- `--memory-limit 512MB`
-- `--temp-dir ./tmp`
-- `--disk-limit 10GB`
-- `--disk-strategy sqlite|hash-partition|external-sort`
-- `--partition-count 128`
-- `--result-mode memory|file`
-- `--lower`
-- `--remove-spaces`
-- `--remove-special`
-
-## Benchmarks
-
-Run local benchmark scenarios with:
-
-```bash
-python benchmarks/run.py --size 100000
-```
-
-For a quick smoke run:
-
-```bash
-python benchmarks/run.py --size 1000 --scenario memory --scenario sqlite
-```
-
-The benchmark runner reports elapsed time, peak memory, result counts, and output file
-size for file-result scenarios.
-
-## Commercial Support
-
-`uniqdiff` Core is free and open-source under the Apache License 2.0. Basic
-comparison, local file support, CLI usage, exact backends, file result mode, lazy
-readers, and the public engine API are not paid features.
-
-Commercial support is available for teams that need production integration,
-performance audits, CI/CD workflows, custom connectors, row-level diff, or reporting
-through the broader UniqTools ecosystem.
-
-See [COMMERCIAL.md](COMMERCIAL.md), [SUPPORT.md](SUPPORT.md), and
-[SERVICES.md](SERVICES.md).
-
-Contact: `dredpirite@gmail.com`
-
-## Fuzzy Comparison
-
-Approximate string comparison is available through a separate API so exact comparison
-semantics stay unchanged:
-
-```python
-from uniqdiff import compare_fuzzy_strings, string_normalizer
-
-result = compare_fuzzy_strings(
-    ["Alice Smith"],
-    ["alice smyth"],
-    threshold=75,
-    normalizer=string_normalizer(lower=True),
-)
-```
-
-Install `uniqdiff[fuzzy]` to use `rapidfuzz`; otherwise the stdlib `difflib` fallback is
-used. Fuzzy comparison is approximate, greedy, and `O(n*m)`. It is a helper API, not
-part of the exact comparison engine.
-
-## Bloom Filter Candidates
-
-Bloom filter helpers are available for approximate candidate filtering:
-
-```python
-from uniqdiff import probabilistic_diff_candidates
-
-result = probabilistic_diff_candidates(
-    old_ids,
-    new_ids,
-    expected_first=1_000_000,
-    expected_second=1_000_000,
-)
-```
-
-Bloom filters can produce false positives. In candidate-diff workflows, a false
-positive can hide a true difference, so this helper is not a replacement for exact
-comparison when every difference must be returned.
-
-## Stable 1.0 Scope
-
-The stable 1.0 engine provides:
-
-- list/tuple/set/iterable comparison;
-- dictionary/object/dataclass comparison by key;
-- recursive canonicalization for non-hashable structures;
-- optional normalization;
-- duplicate detection;
-- file readers for CSV, JSONL, and text;
-- connector API for iterable and file-backed sources;
-- CLI commands for compare, diff, intersection, and duplicates;
-- SQLite-backed disk mode for exact comparison without optional dependencies;
-- hash partitioning disk strategy for partition-by-partition comparison;
-- external sort disk strategy for sorted chunk and merge comparison;
-- file result mode for streaming large results to JSONL/CSV output;
-- approximate fuzzy string comparison as a helper outside exact semantics;
-- Bloom filter helpers for probabilistic candidate filtering outside exact semantics;
-- property-based tests that compare backend semantics;
-- benchmark runner for memory and disk strategies;
-- result serialization to dict, JSON, JSONL, and CSV;
-- stable API parameters for `memory`, `disk`, and `auto` modes.
-
-Lazy result readers are already available for JSONL/CSV file-result outputs.
+Stars help more data engineers and backend engineers find the project, and they
+make it easier to keep improving the engine.
