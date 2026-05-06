@@ -120,6 +120,14 @@ Example:
 Event JSONL is intended for streaming pipelines, CI/CD, and loading into analytical
 engines. It should be preferred over one large JSON object for large outputs.
 
+The JSON Schema for one event line is stored in:
+
+```text
+docs/schemas/uniqdiff-jsonl-1.0.schema.json
+```
+
+Use `iter_event_rows(path)` to read and validate an event stream lazily.
+
 ## Lazy Readers
 
 `iter_result_rows(path, sections=None)` yields dictionaries with `section` and

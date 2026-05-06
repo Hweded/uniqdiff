@@ -30,6 +30,7 @@ The following names are part of the 1.x engine contract:
 - `compare_fields_files`;
 - `compare_file_fields`;
 - `iter_field_diff_rows`;
+- `iter_event_rows`;
 - `infer_schema`;
 - `compare_schema`;
 - `compare_file_schema`;

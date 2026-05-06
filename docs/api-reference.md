@@ -180,6 +180,21 @@ Important parameters:
 This API is designed for callers that want to write JSONL incrementally instead of
 building one large output object.
 
+## `iter_event_rows(output, validate_sequence=True)`
+
+Lazily reads rows from a `uniqdiff.jsonl` event stream.
+
+Behavior:
+
+- validates that every line is a JSON object;
+- validates required fields for each event type;
+- validates `metadata.format == "uniqdiff.jsonl"`;
+- validates `metadata.format_version == "1.0"`;
+- when `validate_sequence=True`, requires the first event to be `metadata` and the
+  last event to be `summary`.
+
+Raises `InvalidInputError` for malformed streams.
+
 ## `compare_sorted_iter(first, second, ...)`
 
 Streams exact `section`/`value` rows for iterable inputs that are already sorted

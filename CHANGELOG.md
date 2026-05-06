@@ -34,6 +34,7 @@
   duplicate-key, error, and summary events.
 - Added `iter_compare_events()` and CLI `--format jsonl` event output for
   machine-readable streaming workflows.
+- Added `iter_event_rows()` and a JSON Schema document for `uniqdiff.jsonl` 1.0.
 
 ## 1.0.0
 

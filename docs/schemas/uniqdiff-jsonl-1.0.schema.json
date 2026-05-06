@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Hweded/uniqdiff/blob/main/docs/schemas/uniqdiff-jsonl-1.0.schema.json",
+  "title": "uniqdiff.jsonl event",
+  "description": "One line/event in the uniqdiff.jsonl 1.0 event stream.",
+  "oneOf": [
+    { "$ref": "#/$defs/metadata" },
+    { "$ref": "#/$defs/only_left" },
+    { "$ref": "#/$defs/only_right" },
+    { "$ref": "#/$defs/row_changed" },
+    { "$ref": "#/$defs/field_change" },
+    { "$ref": "#/$defs/duplicate_key" },
+    { "$ref": "#/$defs/schema_change" },
+    { "$ref": "#/$defs/error" },
+    { "$ref": "#/$defs/summary" }
+  ],
+  "$defs": {
+    "key": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "type",
+        "format",
+        "format_version",
+        "tool",
+        "tool_version",
+        "mode",
+        "key_columns",
+        "compared_columns",
+        "created_at"
+      ],
+      "properties": {
+        "type": { "const": "metadata" },
+        "format": { "const": "uniqdiff.jsonl" },
+        "format_version": { "const": "1.0" },
+        "tool": { "type": "string" },
+        "tool_version": { "type": "string" },
+        "mode": { "type": "string" },
+        "key_columns": { "type": "array", "items": { "type": "string" } },
+        "compared_columns": { "type": "array", "items": { "type": "string" } },
+        "created_at": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "only_left": {
+      "type": "object",
+      "required": ["type", "key"],
+      "properties": {
+        "type": { "const": "only_left" },
+        "key": { "$ref": "#/$defs/key" }
+      },
+      "additionalProperties": true
+    },
+    "only_right": {
+      "type": "object",
+      "required": ["type", "key"],
+      "properties": {
+        "type": { "const": "only_right" },
+        "key": { "$ref": "#/$defs/key" }
+      },
+      "additionalProperties": true
+    },
+    "row_changed": {
+      "type": "object",
+      "required": ["type", "key", "changed_columns"],
+      "properties": {
+        "type": { "const": "row_changed" },
+        "key": { "$ref": "#/$defs/key" },
+        "changed_columns": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "field_change": {
+      "type": "object",
+      "required": ["type", "key", "column", "left", "right"],
+      "properties": {
+        "type": { "const": "field_change" },
+        "key": { "$ref": "#/$defs/key" },
+        "column": { "type": "string" },
+        "left": true,
+        "right": true
+      },
+      "additionalProperties": true
+    },
+    "duplicate_key": {
+      "type": "object",
+      "required": ["type", "side", "key", "count"],
+      "properties": {
+        "type": { "const": "duplicate_key" },
+        "side": { "enum": ["left", "right"] },
+        "key": { "$ref": "#/$defs/key" },
+        "count": { "type": "integer", "minimum": 2 }
+      },
+      "additionalProperties": true
+    },
+    "schema_change": {
+      "type": "object",
+      "required": ["type", "change", "column"],
+      "properties": {
+        "type": { "const": "schema_change" },
+        "change": {
+          "enum": ["column_added", "column_removed", "type_changed", "nullable_changed"]
+        },
+        "column": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "error": {
+      "type": "object",
+      "required": ["type", "code", "message"],
+      "properties": {
+        "type": { "const": "error" },
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "type",
+        "left_rows",
+        "right_rows",
+        "common_rows",
+        "only_left",
+        "only_right",
+        "changed_rows",
+        "changed_fields",
+        "duplicate_keys_left",
+        "duplicate_keys_right",
+        "schema_changes"
+      ],
+      "properties": {
+        "type": { "const": "summary" },
+        "left_rows": { "type": "integer", "minimum": 0 },
+        "right_rows": { "type": "integer", "minimum": 0 },
+        "common_rows": { "type": "integer", "minimum": 0 },
+        "only_left": { "type": "integer", "minimum": 0 },
+        "only_right": { "type": "integer", "minimum": 0 },
+        "changed_rows": { "type": "integer", "minimum": 0 },
+        "changed_fields": { "type": "integer", "minimum": 0 },
+        "duplicate_keys_left": { "type": "integer", "minimum": 0 },
+        "duplicate_keys_right": { "type": "integer", "minimum": 0 },
+        "schema_changes": { "type": "integer", "minimum": 0 },
+        "elapsed_seconds": { "type": "number", "minimum": 0 },
+        "peak_mb": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": true
+    }
+  }
+}

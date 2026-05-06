@@ -9,6 +9,7 @@ from uniqdiff.output.events import (
     compare_result_events,
     event_key,
     field_diff_result_events,
+    iter_event_rows,
     schema_diff_result_events,
     validate_event,
 )
@@ -34,6 +35,7 @@ __all__ = [
     "ensure_result_mode",
     "event_key",
     "field_diff_result_events",
+    "iter_event_rows",
     "iter_result_rows",
     "iter_result_values",
     "schema_diff_result_events",

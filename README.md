@@ -322,12 +322,19 @@ uniqdiff diff snapshot_a snapshot_b \
 Python API:
 
 ```python
-from uniqdiff import compare_files, compare_fields, compare_file_schema, iter_compare_events
+from uniqdiff import (
+    compare_fields,
+    compare_file_schema,
+    compare_files,
+    iter_compare_events,
+    iter_event_rows,
+)
 
 rows = compare_files("old.csv", "new.csv", format="csv", key="id")
 fields = compare_fields(old_rows, new_rows, key="id", columns=("status",))
 schema = compare_file_schema("old.csv", "new.csv", format="csv")
 events = iter_compare_events(old_rows, new_rows, key="id")
+saved_events = iter_event_rows("diff.jsonl")
 ```
 
 JSONL event types:
@@ -345,6 +352,7 @@ JSONL event types:
 | `summary` | Last event; counts and metrics |
 
 The event stream format name is `uniqdiff.jsonl`; the schema version is `1.0`.
+The JSON Schema lives at `docs/schemas/uniqdiff-jsonl-1.0.schema.json`.
 
 Parquet:
 

@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import json
+import os
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
 from uniqdiff._typing import KeySpec
+from uniqdiff.exceptions import InvalidInputError
 from uniqdiff.result import CompareResult
 from uniqdiff.tokens import extract_key
 
@@ -281,6 +285,58 @@ def validate_event(event: Mapping[str, Any]) -> None:
     missing = [field for field in _REQUIRED_FIELDS[event_type] if field not in event]
     if missing:
         raise ValueError(f"{event_type} event is missing required fields: {missing}")
+    if event_type == "metadata":
+        if event.get("format") != EVENT_FORMAT:
+            raise ValueError("metadata event has unsupported format")
+        if event.get("format_version") != EVENT_FORMAT_VERSION:
+            raise ValueError("metadata event has unsupported format_version")
+
+
+def iter_event_rows(
+    output: Union[str, os.PathLike[str]],
+    *,
+    validate_sequence: bool = True,
+) -> Iterator[dict[str, Any]]:
+    """Yield `uniqdiff.jsonl` events lazily from a JSONL event stream.
+
+    Each yielded object is validated for required fields. When
+    `validate_sequence=True`, the reader also enforces the stream envelope:
+    the first event must be `metadata` and the last event must be `summary`.
+    """
+
+    output_path = Path(output)
+    seen_any = False
+    last_type: Optional[str] = None
+    with output_path.open("r", encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise InvalidInputError(
+                    f"Invalid JSONL event at line {line_number} in {output_path}: {exc.msg}"
+                ) from exc
+            if not isinstance(event, dict):
+                raise InvalidInputError(
+                    f"JSONL event at line {line_number} in {output_path} must be an object"
+                )
+            try:
+                validate_event(event)
+            except ValueError as exc:
+                raise InvalidInputError(
+                    f"Invalid JSONL event at line {line_number} in {output_path}: {exc}"
+                ) from exc
+            if validate_sequence and not seen_any and event["type"] != "metadata":
+                raise InvalidInputError("uniqdiff.jsonl stream must start with metadata")
+            seen_any = True
+            last_type = str(event["type"])
+            yield event
+    if validate_sequence:
+        if not seen_any:
+            raise InvalidInputError("uniqdiff.jsonl stream is empty")
+        if last_type != "summary":
+            raise InvalidInputError("uniqdiff.jsonl stream must end with summary")
 
 
 def _event(event_type: EventType, **values: Any) -> dict[str, Any]:
