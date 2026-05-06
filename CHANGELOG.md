@@ -39,6 +39,8 @@
   lazy summary derivation from event streams.
 - Added `iter_field_diff_sorted()` for low-memory field diff on inputs already
   sorted by key.
+- Added CLI `--sorted-input` for low-memory field-diff workflows on already
+  sorted files, including `uniqdiff.jsonl` event output.
 
 ## 1.0.0
 

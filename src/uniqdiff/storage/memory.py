@@ -47,9 +47,7 @@ def compare_memory(
         only_right_keys = [
             token for token in right.first_by_token if token not in left.first_by_token
         ]
-        common_keys = [
-            token for token in left.first_by_token if token in right.first_by_token
-        ]
+        common_keys = [token for token in left.first_by_token if token in right.first_by_token]
     else:
         left_keys = left.first_by_token.keys()
         right_keys = right.first_by_token.keys()

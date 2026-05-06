@@ -105,6 +105,23 @@ Each yielded row has:
 Both inputs must be sorted by the same key. With `validate_sorted=True`, the helper
 raises `InvalidInputError` if it sees keys out of order.
 
+The same mode is available from the CLI for files:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --key id \
+  --field-diff \
+  --sorted-input \
+  --columns price,status \
+  --output changed-fields.jsonl \
+  --summary
+```
+
+This path streams changed field rows and avoids indexing the second input. Summary
+output contains changed-row and changed-field counters; full input row counts are
+intentionally not materialized in this mode.
+
 ## Requirements
 
 Both inputs must be sorted by the same token produced from `key` and

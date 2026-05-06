@@ -189,8 +189,7 @@ def duplicates_partitions(
             for values in partition.values():
                 if len(values) > 1:
                     rows.extend(
-                        (ordinal, _from_blob(payload))
-                        for ordinal, payload in sorted(values)[1:]
+                        (ordinal, _from_blob(payload)) for ordinal, payload in sorted(values)[1:]
                     )
         return _values_by_ordinal(rows)
     finally:

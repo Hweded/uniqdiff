@@ -21,9 +21,7 @@ class JsonlWriter:
         independently parseable JSON object followed by a newline.
         """
 
-        self.fp.write(
-            json.dumps(event, ensure_ascii=False, default=str, separators=(",", ":"))
-        )
+        self.fp.write(json.dumps(event, ensure_ascii=False, default=str, separators=(",", ":")))
         self.fp.write("\n")
         if self.flush:
             self.fp.flush()

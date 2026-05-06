@@ -50,6 +50,12 @@ Find changed fields for matching keys:
 uniqdiff diff old.csv new.csv --format csv --key id --field-diff
 ```
 
+Use the sorted streaming path when upstream exports are already sorted by key:
+
+```bash
+uniqdiff diff old.csv new.csv --format csv --key id --field-diff --sorted-input
+```
+
 Check schema drift:
 
 ```bash

@@ -215,9 +215,7 @@ def compare_result_events(
     for row in result.only_in_second:
         yield _event("only_right", key=event_key(row, key=key, key_columns=columns))
     yield from _duplicate_events("left", result.duplicates_first, key=key, key_columns=columns)
-    yield from _duplicate_events(
-        "right", result.duplicates_second, key=key, key_columns=columns
-    )
+    yield from _duplicate_events("right", result.duplicates_second, key=key, key_columns=columns)
 
     stats = result.stats
     yield build_summary_event(

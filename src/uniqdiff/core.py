@@ -531,4 +531,3 @@ def duplicates_source(
 
     connector = connect(source, kind=kind, **(options or {}))
     return duplicates(connector.open(), **kwargs)
-

@@ -246,6 +246,87 @@ def test_cli_field_diff_writes_jsonl_and_summary(capsys):
     assert rows == [{"key": "1", "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]}]
 
 
+def test_cli_sorted_field_diff_outputs_changed_fields(capsys):
+    left = FIXTURES / "cli-sorted-field-left.csv"
+    right = FIXTURES / "cli-sorted-field-right.csv"
+    left.write_text(
+        "id,name,status\n1,Ann,old\n2,Bob,stable\n4,Dana,old\n",
+        encoding="utf-8",
+    )
+    right.write_text(
+        "id,name,status\n1,Anne,old\n3,Cara,new\n4,Dana,new\n",
+        encoding="utf-8",
+    )
+
+    try:
+        exit_code = main(
+            [
+                "diff",
+                str(left),
+                str(right),
+                "--format",
+                "csv",
+                "--key",
+                "id",
+                "--field-diff",
+                "--sorted-input",
+            ]
+        )
+        payload = json.loads(capsys.readouterr().out)
+    finally:
+        left.unlink(missing_ok=True)
+        right.unlink(missing_ok=True)
+
+    assert exit_code == 0
+    assert payload["rows"] == [
+        {"key": "1", "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]},
+        {"key": "4", "changes": [{"field": "status", "left": "old", "right": "new"}]},
+    ]
+    assert payload["summary_by_column"] == {"name": 1, "status": 1}
+    assert payload["metadata"]["sorted_input"] is True
+
+
+def test_cli_sorted_field_diff_writes_jsonl_and_summary(capsys):
+    left = FIXTURES / "cli-sorted-field-output-left.csv"
+    right = FIXTURES / "cli-sorted-field-output-right.csv"
+    output = FIXTURES / "cli-sorted-field-diff.jsonl"
+    left.write_text("id,name\n1,Ann\n2,Bob\n", encoding="utf-8")
+    right.write_text("id,name\n1,Anne\n2,Bobby\n", encoding="utf-8")
+    output.unlink(missing_ok=True)
+
+    try:
+        exit_code = main(
+            [
+                "diff",
+                str(left),
+                str(right),
+                "--format",
+                "csv",
+                "--key",
+                "id",
+                "--field-diff",
+                "--sorted-input",
+                "--max-rows",
+                "1",
+                "--output",
+                str(output),
+                "--summary",
+            ]
+        )
+        payload = json.loads(capsys.readouterr().out)
+        rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    finally:
+        left.unlink(missing_ok=True)
+        right.unlink(missing_ok=True)
+        output.unlink(missing_ok=True)
+
+    assert exit_code == 0
+    assert payload["changed_row_count"] == 2
+    assert payload["emitted_row_count"] == 1
+    assert payload["truncated"] is True
+    assert rows == [{"key": "1", "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]}]
+
+
 def test_cli_compare_writes_uniqdiff_jsonl_events_to_stdout(capsys):
     exit_code = main(
         [
@@ -373,6 +454,51 @@ def test_cli_field_diff_jsonl_events_include_changed_fields(capsys):
         "left": "old",
         "right": "new",
     }
+
+
+def test_cli_sorted_field_diff_jsonl_events_stream_changed_fields(capsys):
+    left = FIXTURES / "cli-event-sorted-field-left.csv"
+    right = FIXTURES / "cli-event-sorted-field-right.csv"
+    left.write_text("id,name,status\n1,Ann,old\n2,Bob,stable\n", encoding="utf-8")
+    right.write_text("id,name,status\n1,Anne,old\n2,Bob,new\n", encoding="utf-8")
+
+    try:
+        exit_code = main(
+            [
+                "diff",
+                str(left),
+                str(right),
+                "--key",
+                "id",
+                "--format",
+                "jsonl",
+                "--field-diff",
+                "--sorted-input",
+            ]
+        )
+        rows = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    finally:
+        left.unlink(missing_ok=True)
+        right.unlink(missing_ok=True)
+
+    assert exit_code == 0
+    assert [row["type"] for row in rows] == [
+        "metadata",
+        "row_changed",
+        "field_change",
+        "row_changed",
+        "field_change",
+        "summary",
+    ]
+    assert rows[2] == {
+        "type": "field_change",
+        "key": {"id": "1"},
+        "column": "name",
+        "left": "Ann",
+        "right": "Anne",
+    }
+    assert rows[-1]["changed_rows"] == 2
+    assert rows[-1]["changed_fields"] == 2
 
 
 def test_cli_schema_diff_jsonl_events_to_file():
@@ -503,6 +629,26 @@ def test_cli_field_diff_requires_key(capsys):
     assert "uniqdiff: --field-diff requires --key" in captured.err
 
 
+def test_cli_sorted_input_requires_field_diff(capsys):
+    exit_code = main(
+        [
+            "diff",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--format",
+            "csv",
+            "--key",
+            "id",
+            "--sorted-input",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "uniqdiff: --sorted-input requires --field-diff" in captured.err
+
+
 def test_cli_schema_and_field_diff_are_mutually_exclusive(capsys):
     exit_code = main(
         [
@@ -598,6 +744,7 @@ def test_cli_compare_help_mentions_parquet(capsys):
     assert "parquet" in captured.out
     assert "--result-mode" in captured.out
     assert "--memory-limit" in captured.out
+    assert "--sorted-input" in captured.out
 
 
 def test_cli_duplicates_help_hides_compare_only_options(capsys):

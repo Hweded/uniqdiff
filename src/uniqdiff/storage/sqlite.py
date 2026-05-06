@@ -450,6 +450,4 @@ def _check_disk_limit(db_path: Path, disk_limit: Optional[Union[str, int]]) -> N
         return
     limit = parse_size(disk_limit)
     if db_path.stat().st_size > limit:
-        raise DiskLimitExceededError(
-            f"Temporary SQLite storage exceeded disk_limit={disk_limit!r}"
-        )
+        raise DiskLimitExceededError(f"Temporary SQLite storage exceeded disk_limit={disk_limit!r}")

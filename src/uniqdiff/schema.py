@@ -42,9 +42,7 @@ class SchemaResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "columns": {
-                name: schema.to_dict() for name, schema in sorted(self.columns.items())
-            },
+            "columns": {name: schema.to_dict() for name, schema in sorted(self.columns.items())},
             "row_count": self.row_count,
             "sampled": self.sampled,
         }
@@ -78,10 +76,7 @@ class SchemaDiffResult:
     @property
     def has_changes(self) -> bool:
         return bool(
-            self.added_columns
-            or self.removed_columns
-            or self.type_changes
-            or self.nullable_changes
+            self.added_columns or self.removed_columns or self.type_changes or self.nullable_changes
         )
 
 

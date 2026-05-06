@@ -40,9 +40,7 @@ def test_compare_schema_reports_added_removed_type_and_nullable_changes():
 
     assert result.added_columns == ["email"]
     assert result.removed_columns == ["legacy"]
-    assert result.type_changes == [
-        {"column": "age", "left_types": ["int"], "right_types": ["str"]}
-    ]
+    assert result.type_changes == [{"column": "age", "left_types": ["int"], "right_types": ["str"]}]
     assert result.nullable_changes == [
         {"column": "name", "left_nullable": False, "right_nullable": True}
     ]

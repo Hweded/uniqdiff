@@ -68,6 +68,8 @@ Output and behavior flags:
 - `--exclude-columns name,updated_at` for `--field-diff`;
 - `--max-rows 1000` for limiting emitted field-diff rows;
 - `--max-bytes 10MB` for limiting streamed field-diff JSONL output;
+- `--sorted-input` for low-memory field diff when both inputs are already sorted
+  by `--key`;
 - `--schema-diff` for inferred column/type/nullability changes;
 - `--schema-sample-size 10000` for limiting schema inference rows;
 - `--empty-string-not-null` for treating empty strings as string values in schema inference;
@@ -206,11 +208,31 @@ uniqdiff diff old.csv new.csv \
   --output changed-events.jsonl
 ```
 
+When both files are already sorted by the same key, use `--sorted-input` to stream
+matching-key field changes without building an index of the second file:
+
+```bash
+uniqdiff diff old.csv new.csv \
+  --format csv \
+  --key id \
+  --field-diff \
+  --sorted-input \
+  --columns name,status \
+  --summary
+```
+
+`--sorted-input` validates non-descending key order while reading. It reports
+changed-row and changed-field counters, but it does not materialize full
+left/right/common row counts because it is designed for bounded-memory field
+change streaming.
+
 Field-diff CLI constraints:
 
 - `--field-diff` requires `--key`;
 - `--field-diff` cannot be combined with `--schema-diff`;
 - `--field-diff --output` supports only `.jsonl`;
+- `--sorted-input` requires both inputs to be sorted by the same `--key` and
+  normalization settings;
 - `--result-mode` is not used with `--field-diff`.
 
 ## Schema Diff
@@ -255,6 +277,7 @@ uniqdiff compare tests/fixtures/left.csv tests/fixtures/right.csv --format csv -
 uniqdiff compare tests/fixtures/left.tsv tests/fixtures/right.tsv --format tsv --key id
 uniqdiff diff tests/fixtures/left.txt tests/fixtures/right.txt --format txt --output diff.json
 uniqdiff diff tests/fixtures/left.csv tests/fixtures/right.csv --format csv --key id --field-diff --columns name --summary
+uniqdiff diff tests/fixtures/left.csv tests/fixtures/right.csv --format csv --key id --field-diff --sorted-input --columns name --summary
 uniqdiff diff tests/fixtures/left.csv tests/fixtures/right.csv --format csv --schema-diff --summary
 uniqdiff compare tests/fixtures/left.csv tests/fixtures/right.csv --key id --format jsonl
 uniqdiff intersection tests/fixtures/left.jsonl tests/fixtures/right.jsonl --format jsonl --key id

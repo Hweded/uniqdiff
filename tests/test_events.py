@@ -158,9 +158,7 @@ def test_event_summary_observes_events_incrementally():
 
     summary.observe({"type": "only_left", "key": {"id": "1"}})
     summary.observe({"type": "only_right", "key": {"id": "2"}})
-    summary.observe(
-        {"type": "row_changed", "key": {"id": "3"}, "changed_columns": ["price"]}
-    )
+    summary.observe({"type": "row_changed", "key": {"id": "3"}, "changed_columns": ["price"]})
     summary.observe(
         {"type": "field_change", "key": {"id": "3"}, "column": "price", "left": 10, "right": 12}
     )

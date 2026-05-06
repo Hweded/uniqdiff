@@ -66,9 +66,7 @@ class StreamingResultWriter:
 
         if self._csv_writer is None:
             raise RuntimeError("CSV writer is not initialized")
-        self._csv_writer.writerow(
-            {"section": section, "value": self._json_dumps(value)}
-        )
+        self._csv_writer.writerow({"section": section, "value": self._json_dumps(value)})
 
 
 def _json_dumps(value: Any) -> str:

@@ -75,9 +75,7 @@ def build_execution_plan(
         preserve_order=preserve_order,
         disk_limit=disk_limit,
     )
-    use_disk = selected_mode == "disk" or (
-        selected_mode == "auto" and auto_decision["use_disk"]
-    )
+    use_disk = selected_mode == "disk" or (selected_mode == "auto" and auto_decision["use_disk"])
     resolved_disk_strategy = (
         auto_decision["selected_disk_strategy"]
         if selected_disk_strategy == "auto"
@@ -133,9 +131,7 @@ def build_duplicates_plan(
         temp_dir=temp_dir,
         result_mode="memory",
     )
-    use_disk = selected_mode == "disk" or (
-        selected_mode == "auto" and decision["use_disk"]
-    )
+    use_disk = selected_mode == "disk" or (selected_mode == "auto" and decision["use_disk"])
     return ExecutionPlan(
         mode=selected_mode,
         result_mode="memory",
