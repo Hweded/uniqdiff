@@ -4,6 +4,7 @@ from uniqdiff.output.events import (
     EVENT_FORMAT,
     EVENT_FORMAT_VERSION,
     Event,
+    EventSummary,
     build_metadata_event,
     build_summary_event,
     compare_result_events,
@@ -11,6 +12,8 @@ from uniqdiff.output.events import (
     field_diff_result_events,
     iter_event_rows,
     schema_diff_result_events,
+    summarize_event_file,
+    summarize_events,
     validate_event,
 )
 from uniqdiff.output.jsonl import JsonlWriter, write_jsonl_events
@@ -26,6 +29,7 @@ __all__ = [
     "EVENT_FORMAT",
     "EVENT_FORMAT_VERSION",
     "Event",
+    "EventSummary",
     "JsonlWriter",
     "StreamingResultWriter",
     "_json_dumps",
@@ -39,6 +43,8 @@ __all__ = [
     "iter_result_rows",
     "iter_result_values",
     "schema_diff_result_events",
+    "summarize_event_file",
+    "summarize_events",
     "validate_event",
     "write_jsonl_events",
 ]

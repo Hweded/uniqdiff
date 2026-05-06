@@ -4,7 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from uniqdiff import InvalidInputError, compare, iter_compare_events, iter_event_rows
+from uniqdiff import (
+    EventSummary,
+    InvalidInputError,
+    compare,
+    iter_compare_events,
+    iter_event_rows,
+    summarize_event_file,
+    summarize_events,
+)
 from uniqdiff.output import (
     EVENT_FORMAT,
     EVENT_FORMAT_VERSION,
@@ -143,3 +151,86 @@ def test_json_schema_file_is_valid_json_and_documents_event_union():
         EVENT_FORMAT_VERSION
     )
     assert len(schema["oneOf"]) == 9
+
+
+def test_event_summary_observes_events_incrementally():
+    summary = EventSummary()
+
+    summary.observe({"type": "only_left", "key": {"id": "1"}})
+    summary.observe({"type": "only_right", "key": {"id": "2"}})
+    summary.observe(
+        {"type": "row_changed", "key": {"id": "3"}, "changed_columns": ["price"]}
+    )
+    summary.observe(
+        {"type": "field_change", "key": {"id": "3"}, "column": "price", "left": 10, "right": 12}
+    )
+    summary.observe({"type": "duplicate_key", "side": "left", "key": {"id": "4"}, "count": 2})
+    summary.observe({"type": "schema_change", "change": "column_added", "column": "discount"})
+
+    event = summary.to_event()
+
+    assert event["only_left"] == 1
+    assert event["only_right"] == 1
+    assert event["changed_rows"] == 1
+    assert event["changed_fields"] == 1
+    assert event["duplicate_keys_left"] == 1
+    assert event["schema_changes"] == 1
+    assert event["event_count"] == 6
+
+
+def test_summarize_events_can_recompute_without_materializing():
+    events = iter(
+        [
+            build_metadata_event(key_columns=["id"]),
+            {"type": "only_left", "key": {"id": "1"}},
+            {"type": "only_right", "key": {"id": "2"}},
+            build_summary_event(left_rows=10, right_rows=10, only_left=99),
+        ]
+    )
+
+    summary = summarize_events(events, prefer_stream_summary=False)
+
+    assert summary["left_rows"] == 0
+    assert summary["only_left"] == 1
+    assert summary["only_right"] == 1
+    assert summary["event_count"] == 3
+
+
+def test_summarize_events_prefers_stream_summary_by_default():
+    summary = summarize_events(
+        [
+            build_metadata_event(key_columns=["id"]),
+            {"type": "only_left", "key": {"id": "1"}},
+            build_summary_event(left_rows=10, right_rows=10, only_left=99),
+        ]
+    )
+
+    assert summary["left_rows"] == 10
+    assert summary["only_left"] == 99
+
+
+def test_summarize_event_file_reads_lazily():
+    output = FIXTURES / "event-summary-valid.jsonl"
+    try:
+        output.write_text(
+            "\n".join(
+                [
+                    json.dumps(build_metadata_event(key_columns=["id"]), separators=(",", ":")),
+                    json.dumps({"type": "only_left", "key": {"id": "1"}}, separators=(",", ":")),
+                    json.dumps(
+                        build_summary_event(left_rows=1, only_left=1),
+                        separators=(",", ":"),
+                    ),
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        summary = summarize_event_file(output)
+        recomputed = summarize_event_file(output, prefer_stream_summary=False)
+    finally:
+        output.unlink(missing_ok=True)
+
+    assert summary["left_rows"] == 1
+    assert recomputed["only_left"] == 1
+    assert recomputed["event_count"] == 2

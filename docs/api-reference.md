@@ -195,6 +195,23 @@ Behavior:
 
 Raises `InvalidInputError` for malformed streams.
 
+## `summarize_events(events, prefer_stream_summary=True)`
+
+Consumes an iterable of `uniqdiff.jsonl` events and returns a `summary` event
+dictionary.
+
+Behavior:
+
+- does not store the full event stream;
+- validates each observed event;
+- returns the stream's existing `summary` event by default;
+- recomputes counters from observed events when `prefer_stream_summary=False`.
+
+## `summarize_event_file(output, prefer_stream_summary=True, validate_sequence=True)`
+
+Reads a `uniqdiff.jsonl` file lazily through `iter_event_rows()` and returns a
+summary event dictionary.
+
 ## `compare_sorted_iter(first, second, ...)`
 
 Streams exact `section`/`value` rows for iterable inputs that are already sorted

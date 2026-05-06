@@ -34,6 +34,69 @@ EventType = Literal[
 Event = Mapping[str, Any]
 
 
+@dataclass
+class EventSummary:
+    """Incremental counters derived from a `uniqdiff.jsonl` event stream."""
+
+    left_rows: int = 0
+    right_rows: int = 0
+    common_rows: int = 0
+    only_left: int = 0
+    only_right: int = 0
+    changed_rows: int = 0
+    changed_fields: int = 0
+    duplicate_keys_left: int = 0
+    duplicate_keys_right: int = 0
+    schema_changes: int = 0
+    error_count: int = 0
+    event_count: int = 0
+
+    def observe(self, event: Mapping[str, Any]) -> None:
+        """Update counters from one event without retaining the event."""
+
+        validate_event(event)
+        self.event_count += 1
+        event_type = event["type"]
+        if event_type == "only_left":
+            self.only_left += 1
+        elif event_type == "only_right":
+            self.only_right += 1
+        elif event_type == "row_changed":
+            self.changed_rows += 1
+        elif event_type == "field_change":
+            self.changed_fields += 1
+        elif event_type == "duplicate_key":
+            side = event["side"]
+            if side == "left":
+                self.duplicate_keys_left += 1
+            elif side == "right":
+                self.duplicate_keys_right += 1
+        elif event_type == "schema_change":
+            self.schema_changes += 1
+        elif event_type == "error":
+            self.error_count += 1
+
+    def to_event(self) -> dict[str, Any]:
+        """Return a `summary` event for the observed stream."""
+
+        event = build_summary_event(
+            left_rows=self.left_rows,
+            right_rows=self.right_rows,
+            common_rows=self.common_rows,
+            only_left=self.only_left,
+            only_right=self.only_right,
+            changed_rows=self.changed_rows,
+            changed_fields=self.changed_fields,
+            duplicate_keys_left=self.duplicate_keys_left,
+            duplicate_keys_right=self.duplicate_keys_right,
+            schema_changes=self.schema_changes,
+        )
+        if self.error_count:
+            event["error_count"] = self.error_count
+        event["event_count"] = self.event_count
+        return event
+
+
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -337,6 +400,45 @@ def iter_event_rows(
             raise InvalidInputError("uniqdiff.jsonl stream is empty")
         if last_type != "summary":
             raise InvalidInputError("uniqdiff.jsonl stream must end with summary")
+
+
+def summarize_events(
+    events: Iterable[Mapping[str, Any]],
+    *,
+    prefer_stream_summary: bool = True,
+) -> dict[str, Any]:
+    """Summarize an event iterable without storing the full stream.
+
+    When a `summary` event is present and `prefer_stream_summary=True`, that
+    authoritative stream summary is returned. Set `prefer_stream_summary=False` to
+    recompute counters only from observed non-summary events.
+    """
+
+    computed = EventSummary()
+    stream_summary: Optional[dict[str, Any]] = None
+    for event in events:
+        validate_event(event)
+        if event["type"] == "summary":
+            stream_summary = dict(event)
+            continue
+        computed.observe(event)
+    if prefer_stream_summary and stream_summary is not None:
+        return stream_summary
+    return computed.to_event()
+
+
+def summarize_event_file(
+    output: Union[str, os.PathLike[str]],
+    *,
+    prefer_stream_summary: bool = True,
+    validate_sequence: bool = True,
+) -> dict[str, Any]:
+    """Read and summarize a `uniqdiff.jsonl` file lazily."""
+
+    return summarize_events(
+        iter_event_rows(output, validate_sequence=validate_sequence),
+        prefer_stream_summary=prefer_stream_summary,
+    )
 
 
 def _event(event_type: EventType, **values: Any) -> dict[str, Any]:

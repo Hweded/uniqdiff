@@ -128,6 +128,9 @@ docs/schemas/uniqdiff-jsonl-1.0.schema.json
 
 Use `iter_event_rows(path)` to read and validate an event stream lazily.
 
+Use `summarize_events(events)` or `summarize_event_file(path)` to derive a summary
+from an event stream without materializing the full diff.
+
 ## Lazy Readers
 
 `iter_result_rows(path, sections=None)` yields dictionaries with `section` and

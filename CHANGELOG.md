@@ -35,6 +35,8 @@
 - Added `iter_compare_events()` and CLI `--format jsonl` event output for
   machine-readable streaming workflows.
 - Added `iter_event_rows()` and a JSON Schema document for `uniqdiff.jsonl` 1.0.
+- Added `EventSummary`, `summarize_events()`, and `summarize_event_file()` for
+  lazy summary derivation from event streams.
 
 ## 1.0.0
 

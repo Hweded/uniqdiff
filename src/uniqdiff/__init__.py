@@ -54,7 +54,14 @@ from uniqdiff.exceptions import (
 from uniqdiff.fields import FieldChange, FieldDiffResult, FieldDiffStats, iter_field_diff_rows
 from uniqdiff.fuzzy import compare_fuzzy_strings
 from uniqdiff.normalizers import compose_normalizers, string_normalizer
-from uniqdiff.output import iter_event_rows, iter_result_rows, iter_result_values
+from uniqdiff.output import (
+    EventSummary,
+    iter_event_rows,
+    iter_result_rows,
+    iter_result_values,
+    summarize_event_file,
+    summarize_events,
+)
 from uniqdiff.result import CompareResult, CompareStats
 from uniqdiff.schema import ColumnSchema, SchemaDiffResult, SchemaResult
 from uniqdiff.streaming import iter_sorted_diff, write_sorted_diff
@@ -69,6 +76,7 @@ __all__ = [
     "CompareStats",
     "CorruptedInputError",
     "DiskLimitExceededError",
+    "EventSummary",
     "FileConnector",
     "FieldChange",
     "FieldDiffResult",
@@ -121,6 +129,8 @@ __all__ = [
     "probabilistic_diff_candidates",
     "register_connector",
     "string_normalizer",
+    "summarize_event_file",
+    "summarize_events",
     "unique",
     "write_sorted_diff",
     "write_sorted_diff_file",
