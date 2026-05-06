@@ -6,7 +6,8 @@ import csv
 import json
 import os
 import tempfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
+from json.encoder import encode_basestring
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -27,6 +28,7 @@ class StreamingResultWriter:
         self._temp_path: Optional[Path] = None
         self._file: Any = None
         self._csv_writer: Optional[csv.DictWriter[str]] = None
+        self._json_dumps: Callable[[Any], str] = _json_dumps
 
     def __enter__(self) -> StreamingResultWriter:
         fd, temp_name = tempfile.mkstemp(
@@ -55,17 +57,31 @@ class StreamingResultWriter:
         """Write one result row."""
 
         if self.suffix == ".jsonl":
-            self._file.write(
-                json.dumps({"section": section, "value": value}, ensure_ascii=False, default=str)
-            )
-            self._file.write("\n")
+            self._file.write('{"section":')
+            self._file.write(encode_basestring(section))
+            self._file.write(',"value":')
+            self._file.write(self._json_dumps(value))
+            self._file.write("}\n")
             return
 
         if self._csv_writer is None:
             raise RuntimeError("CSV writer is not initialized")
         self._csv_writer.writerow(
-            {"section": section, "value": json.dumps(value, ensure_ascii=False, default=str)}
+            {"section": section, "value": self._json_dumps(value)}
         )
+
+
+def _json_dumps(value: Any) -> str:
+    value_type = type(value)
+    if value is None:
+        return "null"
+    if value_type is bool:
+        return "true" if value else "false"
+    if value_type is int:
+        return str(value)
+    if value_type is str:
+        return encode_basestring(value)
+    return json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":"))
 
 
 def ensure_result_mode(result_mode: str) -> str:

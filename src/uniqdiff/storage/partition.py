@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import pickle
 import tempfile
 from collections import defaultdict
 from collections.abc import Callable, Iterable
@@ -15,6 +14,9 @@ from uniqdiff._utils import parse_size
 from uniqdiff.exceptions import DiskLimitExceededError, TempStorageError
 from uniqdiff.output import StreamingResultWriter
 from uniqdiff.result import CompareResult, CompareStats
+from uniqdiff.storage.codec import from_blob as _from_blob
+from uniqdiff.storage.codec import read_record, write_record
+from uniqdiff.storage.codec import to_blob as _to_blob
 
 TokenFactory = Callable[[Any], Any]
 PartitionRecord = tuple[bytes, int, bytes]
@@ -318,7 +320,7 @@ def _write_partitions(
         for item in items:
             token_blob = _to_blob(token_factory(item))
             partition = _partition_index(token_blob, len(paths))
-            pickle.dump((token_blob, count, _to_blob(item)), handles[partition], protocol=4)
+            write_record(handles[partition], token_blob, count, _to_blob(item))
             count += 1
             if count % chunk_size == 0:
                 _flush(handles)
@@ -335,10 +337,10 @@ def _read_partition(path: Path) -> dict[bytes, list[tuple[int, bytes]]]:
     rows: dict[bytes, list[tuple[int, bytes]]] = defaultdict(list)
     with path.open("rb") as file:
         while True:
-            try:
-                token, ordinal, payload = pickle.load(file)
-            except EOFError:
+            record = read_record(file)
+            if record is None:
                 break
+            token, ordinal, payload = record
             rows[token].append((ordinal, payload))
     return dict(rows)
 
@@ -367,14 +369,6 @@ def _check_disk_limit(paths: list[Path], disk_limit: Optional[Union[str, int]]) 
 def _validate_partition_count(partition_count: int) -> None:
     if partition_count <= 0:
         raise ValueError("partition_count must be greater than zero")
-
-
-def _to_blob(value: Any) -> bytes:
-    return pickle.dumps(value, protocol=4)
-
-
-def _from_blob(value: bytes) -> Any:
-    return pickle.loads(value)
 
 
 def _values_by_ordinal(rows: list[tuple[int, Any]]) -> list[Any]:

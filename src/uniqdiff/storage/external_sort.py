@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import heapq
 import os
-import pickle
 import tempfile
 from collections.abc import Callable, Iterable, Iterator
 from pathlib import Path
@@ -14,6 +13,9 @@ from uniqdiff._utils import parse_size
 from uniqdiff.exceptions import DiskLimitExceededError, TempStorageError
 from uniqdiff.output import StreamingResultWriter
 from uniqdiff.result import CompareResult, CompareStats
+from uniqdiff.storage.codec import from_blob as _from_blob
+from uniqdiff.storage.codec import read_record, write_record
+from uniqdiff.storage.codec import to_blob as _to_blob
 
 TokenFactory = Callable[[Any], Any]
 SortRecord = tuple[bytes, int, bytes]
@@ -403,8 +405,8 @@ def _write_chunk(records: list[SortRecord], *, side: str, temp_dir: Optional[str
     records.sort(key=lambda record: (record[0], record[1]))
     path = _make_temp_path(temp_dir, side)
     with path.open("wb") as file:
-        for record in records:
-            pickle.dump(record, file, protocol=4)
+        for token, ordinal, payload in records:
+            write_record(file, token, ordinal, payload)
     return path
 
 
@@ -416,10 +418,10 @@ def _merge_chunks(paths: list[Path]) -> Iterator[SortRecord]:
 def _read_chunk(path: Path) -> Iterator[SortRecord]:
     with path.open("rb") as file:
         while True:
-            try:
-                yield pickle.load(file)
-            except EOFError:
+            record = read_record(file)
+            if record is None:
                 break
+            yield record
 
 
 def _group_sorted_records(records: Iterator[SortRecord]) -> Iterator[GroupedRecord]:
@@ -466,14 +468,6 @@ def _check_disk_limit(paths: list[Path], disk_limit: Optional[Union[str, int]]) 
         raise DiskLimitExceededError(
             f"Temporary external sort chunks exceeded disk_limit={disk_limit!r}"
         )
-
-
-def _to_blob(value: Any) -> bytes:
-    return pickle.dumps(value, protocol=4)
-
-
-def _from_blob(value: bytes) -> Any:
-    return pickle.loads(value)
 
 
 def _values_by_ordinal(rows: list[tuple[int, Any]]) -> list[Any]:

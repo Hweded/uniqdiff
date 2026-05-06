@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import pickle
 import sqlite3
 import tempfile
 from collections.abc import Callable, Iterable
@@ -14,6 +13,8 @@ from uniqdiff._utils import parse_size
 from uniqdiff.exceptions import DiskLimitExceededError, TempStorageError
 from uniqdiff.output import StreamingResultWriter
 from uniqdiff.result import CompareResult, CompareStats
+from uniqdiff.storage.codec import from_blob as _from_blob
+from uniqdiff.storage.codec import to_blob as _to_blob
 
 TokenFactory = Callable[[Any], Any]
 
@@ -442,14 +443,6 @@ def _count_common(conn: sqlite3.Connection) -> int:
         """
     ).fetchone()
     return int(row[0])
-
-
-def _to_blob(value: Any) -> bytes:
-    return pickle.dumps(value, protocol=4)
-
-
-def _from_blob(value: bytes) -> Any:
-    return pickle.loads(value)
 
 
 def _check_disk_limit(db_path: Path, disk_limit: Optional[Union[str, int]]) -> None:

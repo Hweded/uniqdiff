@@ -44,18 +44,35 @@ machine-specific.
 ## Local Snapshot
 
 Snapshot from a local run on `12_000` rows per input, `50%` overlap,
-`chunk_size=4000`, and `partition_count=16`.
+`chunk_size=4000`, and `partition_count=16`, after the first profiling-driven
+storage/output optimization pass.
 
 | Scenario | Elapsed, s | Peak MB | Primary bottleneck |
 |---|---:|---:|---|
-| memory | 0.013 | 1.532 | `memory._index_items`, `tokens.canonicalize_token` |
-| memory_no_order | 0.014 | 2.877 | `memory._index_items`, `tokens.canonicalize_token` |
-| sqlite | 0.414 | 0.961 | `_pickle.dumps`, `sqlite._insert_items`, SQLite `execute` |
-| hash_partition | 0.888 | 3.190 | partition write/read, `_pickle.dumps`, `_pickle.load` |
-| external_sort | 0.955 | 3.246 | `_merge_grouped`, `_write_sorted_chunks`, chunk merge/grouping |
-| file_result | 0.862 | 1.022 | `StreamingResultWriter.write`, `json.dumps`, SQLite insert |
-| sorted_stream | 0.112 | 3.301 | `streaming._group_sorted`, token comparisons |
-| sorted_stream_file | 0.419 | 0.174 | `json.dumps`, `StreamingResultWriter.write`, streaming merge |
+| memory | 0.012 | 1.532 | `memory._index_items`, `tokens.canonicalize_token` |
+| memory_no_order | 0.011 | 2.877 | `memory._index_items`, `tokens.canonicalize_token` |
+| sqlite | 0.348 | 0.893 | `storage.codec.to_blob`, `sqlite._insert_items`, SQLite `execute` |
+| hash_partition | 0.732 | 3.133 | partition write/read, `storage.codec.read_record`, `storage.codec.to_blob` |
+| external_sort | 0.764 | 2.880 | `_merge_grouped`, `_group_sorted_records`, `heapq.merge` |
+| file_result | 0.514 | 0.965 | SQLite insert/fetch, `StreamingResultWriter.write`, JSON value encoding |
+| sorted_stream | 0.134 | 3.301 | `streaming._group_sorted`, token comparisons |
+| sorted_stream_file | 0.179 | 0.185 | streaming merge and JSON value encoding |
+
+Compared with the previous local snapshot on the same workload, the first pass
+reduced elapsed time by roughly:
+
+- `sqlite`: from `0.414s` to `0.348s`;
+- `hash_partition`: from `0.888s` to `0.732s`;
+- `external_sort`: from `0.955s` to `0.764s`;
+- `file_result`: from `0.862s` to `0.514s`;
+- `sorted_stream_file`: from `0.419s` to `0.179s`.
+
+The main changes were:
+
+- compact temporary scalar encoding for disk backends;
+- length-prefixed binary temporary records for hash partition and external sort;
+- leaner JSONL row writing that avoids allocating a full row dict per output row;
+- fast JSON value encoding for common scalar output values.
 
 ## Findings
 
@@ -75,9 +92,9 @@ Likely improvements:
 
 ### SQLite Disk Mode
 
-The main cost is payload serialization and database insertion:
+The main cost is payload encoding and database insertion:
 
-- `_pickle.dumps`;
+- `storage.codec.to_blob`;
 - `sqlite._insert_items`;
 - SQLite `execute`;
 - result section fetches.
@@ -85,22 +102,22 @@ The main cost is payload serialization and database insertion:
 Likely improvements:
 
 - batch insert tuning;
-- faster payload encoding for scalar values;
+- more scalar-specialized payload encoding;
 - optional compact row encoding for simple tokens;
 - avoid fetching materialized sections when file output is requested.
 
 ### Hash Partition
 
-The main cost is partition serialization and deserialization:
+The main cost is partition writing, reading, and grouping:
 
 - `_write_partitions`;
 - `_read_partition`;
-- `_pickle.dumps`;
-- `_pickle.load`.
+- `storage.codec.write_record`;
+- `storage.codec.read_record`;
+- `storage.codec.to_blob`.
 
 Likely improvements:
 
-- compact binary/text encoding for scalar rows;
 - buffered partition writers;
 - fewer file open/close cycles;
 - parallel partition processing after correctness and ordering semantics are
@@ -108,7 +125,8 @@ Likely improvements:
 
 ### External Sort
 
-The main cost is chunk writing and merge/group iteration:
+The main cost is merge/group iteration after temporary record encoding was
+reduced:
 
 - `_write_sorted_chunks`;
 - `_merge_grouped`;
@@ -117,24 +135,24 @@ The main cost is chunk writing and merge/group iteration:
 
 Likely improvements:
 
-- reduce pickle overhead for scalar rows;
 - tune chunk size;
 - specialize merge for scalar tokens;
 - avoid materializing result sections when direct file output is requested.
 
 ### File Result Mode
 
-For JSONL output, `json.dumps` dominates row writing:
+For scalar-heavy JSONL output, row writing is no longer dominated by a full
+`json.dumps` call per row. The remaining cost is split across:
 
 - `StreamingResultWriter.write`;
-- `json.dumps`;
-- JSON encoder internals.
+- scalar JSON value encoding;
+- file writes;
+- upstream SQLite fetch/insert work in `file_result` mode.
 
 Likely improvements:
 
-- faster JSON writer path for scalar values;
-- optional compact separators;
 - batch buffering for JSONL lines;
+- optional faster JSON writer for structured values;
 - consider optional faster JSON extra in a separate optional dependency, not core.
 
 ### Sorted Streaming
@@ -152,8 +170,8 @@ Likely improvements:
 
 ## Current Optimization Priorities
 
-1. Add compact serialization paths for scalar values in disk backends.
-2. Optimize JSONL output writes for file result and sorted streaming output.
-3. Tune SQLite batch insertion and fetch paths.
-4. Explore buffered hash partition writers.
+1. Tune SQLite batch insertion and fetch paths.
+2. Explore buffered hash partition writers and larger partition buffers.
+3. Specialize external sort merge paths for scalar tokens.
+4. Add optional faster JSON output under a separate optional extra, not core.
 5. Add larger profiling runs for dict rows and key-based comparison.

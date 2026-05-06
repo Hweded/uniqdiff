@@ -15,6 +15,10 @@
   output from sorted streaming comparison.
 - Added a reproducible profiling suite for memory, disk, file-result, and sorted
   streaming modes, with JSONL output and Markdown reports.
+- Optimized disk temporary storage with compact scalar blobs and length-prefixed
+  binary temp records for hash partitioning and external sort.
+- Reduced JSONL file-result overhead by avoiding per-row result dict allocation
+  and fast-pathing common scalar JSON values.
 
 ## 1.0.0
 
