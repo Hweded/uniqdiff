@@ -13,6 +13,8 @@ from uniqdiff.disk import atomic_write_result
 from uniqdiff.fields import FieldDiffResult
 from uniqdiff.fields import compare_fields as _compare_fields
 from uniqdiff.fields import compare_fields_files as _compare_fields_files
+from uniqdiff.fields import compare_fields_files_sorted as _compare_fields_files_sorted
+from uniqdiff.fields import compare_fields_sorted as _compare_fields_sorted
 from uniqdiff.fields import iter_field_diff_sorted as _iter_field_diff_sorted
 from uniqdiff.output import compare_result_events
 from uniqdiff.planner import build_duplicates_plan, build_execution_plan, disk_compare_backend
@@ -244,6 +246,18 @@ def compare_fields(
     return _compare_fields(first, second, key=key, **kwargs)
 
 
+def compare_fields_sorted(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec,
+    **kwargs: Any,
+) -> FieldDiffResult:
+    """Compare changed fields for inputs already sorted by key."""
+
+    return _compare_fields_sorted(first, second, key=key, **kwargs)
+
+
 def iter_field_diff_sorted(
     first: Iterable[Any],
     second: Iterable[Any],
@@ -266,6 +280,18 @@ def compare_fields_files(
     """Compare changed fields for keyed rows in two supported files."""
 
     return _compare_fields_files(file_a, file_b, key=key, **kwargs)
+
+
+def compare_fields_files_sorted(
+    file_a: str,
+    file_b: str,
+    *,
+    key: KeySpec,
+    **kwargs: Any,
+) -> FieldDiffResult:
+    """Compare changed fields in two sorted supported files."""
+
+    return _compare_fields_files_sorted(file_a, file_b, key=key, **kwargs)
 
 
 def infer_schema(rows: Iterable[Any], **kwargs: Any) -> SchemaResult:
@@ -450,6 +476,49 @@ def compare_file_fields(
         output=output,
         max_rows=max_rows,
         max_bytes=max_bytes,
+    )
+
+
+def compare_file_fields_sorted(
+    file_a: str,
+    file_b: str,
+    *,
+    key: KeySpec,
+    format: str = "auto",
+    encoding: str = "utf-8",
+    delimiter: Optional[str] = None,
+    quotechar: Optional[str] = '"',
+    has_header: bool = True,
+    fieldnames: Optional[Sequence[str]] = None,
+    columns: Optional[Sequence[str]] = None,
+    exclude_columns: Optional[Sequence[str]] = None,
+    batch_size: int = 65_536,
+    normalizer: Optional[Normalizer] = None,
+    output: Optional[str] = None,
+    max_rows: Optional[int] = None,
+    max_bytes: Optional[Union[str, int]] = None,
+    validate_sorted: bool = True,
+) -> FieldDiffResult:
+    """Compare changed fields in two sorted supported files."""
+
+    return _compare_fields_files_sorted(
+        file_a,
+        file_b,
+        key=key,
+        format=format,
+        encoding=encoding,
+        delimiter=delimiter,
+        quotechar=quotechar,
+        has_header=has_header,
+        fieldnames=fieldnames,
+        columns=columns,
+        exclude_columns=exclude_columns,
+        batch_size=batch_size,
+        normalizer=normalizer,
+        output=output,
+        max_rows=max_rows,
+        max_bytes=max_bytes,
+        validate_sorted=validate_sorted,
     )
 
 

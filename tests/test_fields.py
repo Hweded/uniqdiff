@@ -7,6 +7,8 @@ from uniqdiff import (
     InvalidInputError,
     compare_fields,
     compare_fields_files,
+    compare_fields_files_sorted,
+    compare_fields_sorted,
     iter_field_diff_rows,
     iter_field_diff_sorted,
 )
@@ -198,3 +200,72 @@ def test_iter_field_diff_sorted_validates_key_order():
 
     with pytest.raises(InvalidInputError, match="not sorted by key"):
         list(rows)
+
+
+def test_compare_fields_sorted_returns_result_and_summary():
+    result = compare_fields_sorted(
+        [
+            {"id": 1, "name": "Ann", "city": "Paris"},
+            {"id": 2, "name": "Bob", "city": "Berlin"},
+        ],
+        [
+            {"id": 1, "name": "Anne", "city": "Paris"},
+            {"id": 2, "name": "Bob", "city": "Rome"},
+        ],
+        key="id",
+    )
+
+    assert result.rows == [
+        {"key": 1, "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]},
+        {"key": 2, "changes": [{"field": "city", "left": "Berlin", "right": "Rome"}]},
+    ]
+    assert result.summary_by_column == {"name": 1, "city": 1}
+    assert result.stats.changed_row_count == 2
+    assert result.stats.emitted_row_count == 2
+    assert result.metadata["sorted_input"] is True
+    assert result.warnings == [
+        "Sorted field diff streams changed rows and does not materialize full input row counts."
+    ]
+
+
+def test_compare_fields_sorted_streams_jsonl_and_limits_rows():
+    output = FIXTURES / "field-diff-sorted.jsonl"
+    output.unlink(missing_ok=True)
+    try:
+        result = compare_fields_sorted(
+            [{"id": 1, "name": "a"}, {"id": 2, "name": "b"}],
+            [{"id": 1, "name": "x"}, {"id": 2, "name": "y"}],
+            key="id",
+            output=output,
+            max_rows=1,
+        )
+        rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    finally:
+        output.unlink(missing_ok=True)
+
+    assert result.rows == []
+    assert result.stats.changed_row_count == 2
+    assert result.stats.emitted_row_count == 1
+    assert result.stats.truncated is True
+    assert rows == [{"key": 1, "changes": [{"field": "name", "left": "a", "right": "x"}]}]
+
+
+def test_compare_fields_files_sorted_reads_csv():
+    left = FIXTURES / "field-sorted-left.csv"
+    right = FIXTURES / "field-sorted-right.csv"
+    left.write_text("id,name\n1,Ann\n2,Bob\n", encoding="utf-8")
+    right.write_text("id,name\n1,Anne\n2,Bob\n", encoding="utf-8")
+    try:
+        result = compare_fields_files_sorted(
+            str(left),
+            str(right),
+            format="csv",
+            key="id",
+        )
+    finally:
+        left.unlink(missing_ok=True)
+        right.unlink(missing_ok=True)
+
+    assert result.rows == [
+        {"key": "1", "changes": [{"field": "name", "left": "Ann", "right": "Anne"}]}
+    ]

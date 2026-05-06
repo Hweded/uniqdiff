@@ -99,14 +99,39 @@ Each yielded row has:
 {"key": row_key, "changes": [{"field": "status", "left": "old", "right": "new"}]}
 ```
 
+## `compare_fields_sorted(first, second, key=...)`
+
+Runs sorted streaming field comparison and returns `FieldDiffResult`.
+
+Use this when callers want the same low-memory sorted behavior as
+`iter_field_diff_sorted()`, but also need:
+
+- `summary_by_column`;
+- changed-row and changed-field counters;
+- optional `.jsonl` output;
+- `max_rows` / `max_bytes` limits;
+- a result object compatible with field-diff CLI summaries.
+
+Full input row counts are not materialized in this mode. `stats.first_count`,
+`stats.second_count`, and `stats.compared_count` remain `0`.
+
 ## `compare_fields_files(file_a, file_b, key=...)`
 
 Reads supported files and runs `compare_fields()`. CSV, TSV, JSONL, TXT, and
 Parquet inputs follow the same reader options as `compare_files()`.
 
+## `compare_fields_files_sorted(file_a, file_b, key=...)`
+
+Reads supported files and runs `compare_fields_sorted()`. Use it for CSV, TSV,
+JSONL, TXT, or Parquet exports that are already sorted by the same key.
+
 ## `compare_file_fields(file_a, file_b, key=...)`
 
 Alias-style public facade for file-oriented field comparison.
+
+## `compare_file_fields_sorted(file_a, file_b, key=...)`
+
+Alias-style public facade for file-oriented sorted field comparison.
 
 ## `iter_field_diff_rows(output)`
 

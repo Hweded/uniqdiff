@@ -27,9 +27,12 @@ The following names are part of the 1.x engine contract:
 - `duplicates_source`;
 - `iter_compare_events`;
 - `compare_fields`;
+- `compare_fields_sorted`;
 - `iter_field_diff_sorted`;
 - `compare_fields_files`;
+- `compare_fields_files_sorted`;
 - `compare_file_fields`;
+- `compare_file_fields_sorted`;
 - `iter_field_diff_rows`;
 - `iter_event_rows`;
 - `summarize_events`;

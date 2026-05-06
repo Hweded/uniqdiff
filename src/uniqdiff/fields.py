@@ -20,6 +20,9 @@ from uniqdiff.tokens import extract_key
 
 _NO_OUTPUT_WARNING = "Field diff rows were streamed to output and are not materialized."
 _TRUNCATED_WARNING = "Field diff output was truncated by max_rows or max_bytes."
+_SORTED_COUNTS_WARNING = (
+    "Sorted field diff streams changed rows and does not materialize full input row counts."
+)
 _DUPLICATE_RIGHT_KEY_WARNING = (
     "Duplicate keys were found in the second input; only the first row per key was used."
 )
@@ -212,6 +215,46 @@ def iter_field_diff_sorted(
         right_item = next(right_groups, None)
 
 
+def compare_fields_sorted(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec,
+    columns: Optional[Sequence[str]] = None,
+    exclude_columns: Optional[Sequence[str]] = None,
+    normalizer: Optional[Normalizer] = None,
+    output: Optional[Union[str, os.PathLike[str]]] = None,
+    max_rows: Optional[int] = None,
+    max_bytes: Optional[Union[str, int]] = None,
+    validate_sorted: bool = True,
+) -> FieldDiffResult:
+    """Compare changed fields for inputs already sorted by key.
+
+    This result-oriented helper is the bounded-memory counterpart to
+    `compare_fields()`. It streams both inputs and keeps only the current equal-key
+    groups in memory. Full input row counts are intentionally not materialized.
+    """
+
+    rows = iter_field_diff_sorted(
+        first,
+        second,
+        key=key,
+        columns=columns,
+        exclude_columns=exclude_columns,
+        normalizer=normalizer,
+        validate_sorted=validate_sorted,
+    )
+    return _build_sorted_result(
+        rows,
+        key=key,
+        columns=columns,
+        exclude_columns=exclude_columns,
+        output=output,
+        max_rows=max_rows,
+        max_bytes=max_bytes,
+    )
+
+
 def iter_field_diff_rows(output: Union[str, os.PathLike[str]]) -> Iterator[dict[str, Any]]:
     """Yield field-diff rows lazily from a JSONL field diff output file."""
 
@@ -269,6 +312,49 @@ def compare_fields_files(
         batch_size=batch_size,
     )
     return compare_fields(first, second, key=key, columns=columns, **kwargs)
+
+
+def compare_fields_files_sorted(
+    file_a: str,
+    file_b: str,
+    *,
+    key: KeySpec,
+    format: str = "auto",
+    encoding: str = "utf-8",
+    delimiter: Optional[str] = None,
+    quotechar: Optional[str] = '"',
+    has_header: bool = True,
+    fieldnames: Optional[Sequence[str]] = None,
+    columns: Optional[Sequence[str]] = None,
+    batch_size: int = 65_536,
+    **kwargs: Any,
+) -> FieldDiffResult:
+    """Read supported files and run sorted streaming field comparison."""
+
+    read_columns = _read_columns(columns, key)
+    first = read_file(
+        file_a,
+        format=format,
+        encoding=encoding,
+        delimiter=delimiter,
+        quotechar=quotechar,
+        has_header=has_header,
+        fieldnames=fieldnames,
+        columns=read_columns,
+        batch_size=batch_size,
+    )
+    second = read_file(
+        file_b,
+        format=format,
+        encoding=encoding,
+        delimiter=delimiter,
+        quotechar=quotechar,
+        has_header=has_header,
+        fieldnames=fieldnames,
+        columns=read_columns,
+        batch_size=batch_size,
+    )
+    return compare_fields_sorted(first, second, key=key, columns=columns, **kwargs)
 
 
 def _changed_fields(
@@ -415,6 +501,68 @@ def _build_result(
     )
 
 
+def _build_sorted_result(
+    rows: Iterable[dict[str, Any]],
+    *,
+    key: KeySpec,
+    columns: Optional[Sequence[str]],
+    exclude_columns: Optional[Sequence[str]],
+    output: Optional[Union[str, os.PathLike[str]]],
+    max_rows: Optional[int],
+    max_bytes: Optional[Union[str, int]],
+) -> FieldDiffResult:
+    config = _build_config(
+        key=key,
+        columns=columns,
+        exclude_columns=exclude_columns,
+        normalizer=None,
+        max_rows=max_rows,
+        max_bytes=max_bytes,
+    )
+    accumulator = _FieldDiffAccumulator()
+
+    with _JSONLFieldWriter.open_optional(output, max_bytes=config.max_bytes) as writer:
+        for row in rows:
+            changes = list(row.get("changes", ()))
+            accumulator.changed_row_count += 1
+            accumulator.changed_field_count += len(changes)
+            for change in changes:
+                accumulator.summary[str(change.get("field"))] += 1
+
+            if not accumulator.can_emit(config.max_rows):
+                accumulator.truncated = True
+                continue
+            if writer is not None:
+                if not writer.write(row):
+                    accumulator.truncated = True
+                    continue
+                accumulator.output_bytes = writer.bytes_written
+            else:
+                accumulator.rows.append(row)
+            accumulator.emitted_row_count += 1
+
+    return FieldDiffResult(
+        rows=accumulator.rows,
+        summary_by_column=dict(accumulator.summary),
+        stats=FieldDiffStats(
+            changed_row_count=accumulator.changed_row_count,
+            changed_field_count=accumulator.changed_field_count,
+            emitted_row_count=accumulator.emitted_row_count,
+            output_bytes=accumulator.output_bytes,
+            truncated=accumulator.truncated,
+        ),
+        metadata={
+            "key": _metadata_key(key),
+            "columns": list(columns) if columns is not None else None,
+            "exclude_columns": list(exclude_columns) if exclude_columns is not None else None,
+            "output": str(output) if output is not None else None,
+            "result_mode": "file" if output is not None else "memory",
+            "sorted_input": True,
+        },
+        warnings=_sorted_result_warnings(output=output, truncated=accumulator.truncated),
+    )
+
+
 def _result_warnings(
     *,
     output: Optional[Union[str, os.PathLike[str]]],
@@ -428,6 +576,19 @@ def _result_warnings(
         warnings.append(_TRUNCATED_WARNING)
     if duplicate_right_key_count:
         warnings.append(_DUPLICATE_RIGHT_KEY_WARNING)
+    return warnings
+
+
+def _sorted_result_warnings(
+    *,
+    output: Optional[Union[str, os.PathLike[str]]],
+    truncated: bool,
+) -> list[str]:
+    warnings = [_SORTED_COUNTS_WARNING]
+    if output is not None:
+        warnings.append(_NO_OUTPUT_WARNING)
+    if truncated:
+        warnings.append(_TRUNCATED_WARNING)
     return warnings
 
 

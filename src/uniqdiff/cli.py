@@ -13,15 +13,14 @@ from typing import Any, Optional, Union
 
 from uniqdiff import (
     FieldDiffResult,
-    FieldDiffStats,
     SchemaDiffResult,
     compare_file_fields,
+    compare_file_fields_sorted,
     compare_file_schema,
     compare_files,
     duplicates,
     iter_field_diff_sorted,
 )
-from uniqdiff._utils import parse_size
 from uniqdiff.disk import atomic_write_result
 from uniqdiff.exceptions import UniqDiffError
 from uniqdiff.io.readers import read_file
@@ -715,21 +714,23 @@ def _run_sorted_field_diff(
     fieldnames: Optional[Sequence[str]],
     columns: Optional[Sequence[str]],
 ) -> FieldDiffResult:
-    rows = _sorted_field_diff_rows(
-        args,
-        key=key,
-        normalizer=normalizer,
+    return compare_file_fields_sorted(
+        args.file_a,
+        args.file_b,
+        format=_input_format(args),
+        encoding=args.encoding,
+        delimiter=args.delimiter,
+        quotechar=args.quotechar,
+        has_header=not args.no_header,
         fieldnames=fieldnames,
         columns=columns,
-    )
-    return _materialize_or_write_sorted_field_rows(
-        rows,
+        batch_size=args.parquet_batch_size,
         key=key,
-        columns=columns,
-        exclude_columns=_parse_fieldnames(args.exclude_columns),
+        normalizer=normalizer,
         output=args.output,
         max_rows=args.max_rows,
         max_bytes=args.max_bytes,
+        exclude_columns=_parse_fieldnames(args.exclude_columns),
     )
 
 
@@ -771,107 +772,6 @@ def _sorted_field_diff_rows(
         columns=columns,
         exclude_columns=_parse_fieldnames(args.exclude_columns),
         normalizer=normalizer,
-    )
-
-
-def _materialize_or_write_sorted_field_rows(
-    rows: Iterator[dict[str, Any]],
-    *,
-    key: Union[str, tuple[str, ...]],
-    columns: Optional[Sequence[str]],
-    exclude_columns: Optional[Sequence[str]],
-    output: Optional[str],
-    max_rows: Optional[int],
-    max_bytes: Optional[Union[str, int]],
-) -> FieldDiffResult:
-    output_path = Path(output) if output is not None else None
-    memory_rows: list[dict[str, Any]] = []
-    summary: dict[str, int] = {}
-    changed_row_count = 0
-    changed_field_count = 0
-    emitted_row_count = 0
-    output_bytes = 0
-    truncated = False
-    byte_limit = parse_size(max_bytes) if max_bytes is not None else None
-
-    def consume_row(row: dict[str, Any], fp: Optional[Any]) -> None:
-        nonlocal changed_row_count
-        nonlocal changed_field_count
-        nonlocal emitted_row_count
-        nonlocal output_bytes
-        nonlocal truncated
-
-        changed_row_count += 1
-        changes = list(row.get("changes", ()))
-        changed_field_count += len(changes)
-        for change in changes:
-            field_name = str(change.get("field"))
-            summary[field_name] = summary.get(field_name, 0) + 1
-
-        if max_rows is not None and emitted_row_count >= max_rows:
-            truncated = True
-            return
-
-        line = _compact_json_line(row)
-        line_bytes = len(line.encode("utf-8"))
-        if byte_limit is not None and output_bytes + line_bytes > byte_limit:
-            truncated = True
-            return
-
-        if fp is None:
-            memory_rows.append(row)
-        else:
-            fp.write(line)
-            output_bytes += line_bytes
-        emitted_row_count += 1
-
-    if output_path is None:
-        for row in rows:
-            consume_row(row, None)
-    else:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        fd, temp_name = tempfile.mkstemp(
-            prefix=f".{output_path.name}.",
-            dir=str(output_path.parent),
-        )
-        os.close(fd)
-        temp_path = Path(temp_name)
-        try:
-            with temp_path.open("w", encoding="utf-8", newline="") as file:
-                for row in rows:
-                    consume_row(row, file)
-            os.replace(temp_path, output_path)
-        except Exception:
-            temp_path.unlink(missing_ok=True)
-            raise
-
-    warnings = [
-        ("Sorted field diff streams changed rows and does not materialize full input row counts.")
-    ]
-    if output is not None:
-        warnings.append("Field diff rows were streamed to output and are not materialized.")
-    if truncated:
-        warnings.append("Field diff output was truncated by max_rows or max_bytes.")
-
-    return FieldDiffResult(
-        rows=memory_rows,
-        summary_by_column=summary,
-        stats=FieldDiffStats(
-            changed_row_count=changed_row_count,
-            changed_field_count=changed_field_count,
-            emitted_row_count=emitted_row_count,
-            output_bytes=output_bytes,
-            truncated=truncated,
-        ),
-        metadata={
-            "key": list(key) if isinstance(key, tuple) else key,
-            "columns": list(columns) if columns is not None else None,
-            "exclude_columns": (list(exclude_columns) if exclude_columns is not None else None),
-            "output": str(output) if output is not None else None,
-            "result_mode": "file" if output is not None else "memory",
-            "sorted_input": True,
-        },
-        warnings=warnings,
     )
 
 
@@ -1025,10 +925,6 @@ def _iter_memory_field_event_rows(
             }
             validate_event(event)
             yield event
-
-
-def _compact_json_line(payload: Any) -> str:
-    return json.dumps(payload, ensure_ascii=False, default=str, separators=(",", ":")) + "\n"
 
 
 def _temporary_jsonl_path(args: argparse.Namespace) -> Path:

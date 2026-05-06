@@ -41,6 +41,9 @@
   sorted by key.
 - Added CLI `--sorted-input` for low-memory field-diff workflows on already
   sorted files, including `uniqdiff.jsonl` event output.
+- Added result-oriented sorted field-diff APIs:
+  `compare_fields_sorted()`, `compare_fields_files_sorted()`, and
+  `compare_file_fields_sorted()`.
 
 ## 1.0.0
 
