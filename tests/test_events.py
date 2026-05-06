@@ -10,6 +10,8 @@ from uniqdiff import (
     compare,
     iter_compare_events,
     iter_event_rows,
+    iter_field_diff_events,
+    iter_sorted_field_diff_events,
     summarize_event_file,
     summarize_events,
 )
@@ -20,6 +22,8 @@ from uniqdiff.output import (
     build_metadata_event,
     build_summary_event,
     compare_result_events,
+    field_diff_file_events,
+    field_diff_row_events,
     validate_event,
 )
 
@@ -80,6 +84,55 @@ def test_compare_result_events_have_metadata_first_and_summary_last():
     assert events[-1]["common_rows"] == 1
 
 
+def test_field_diff_row_events_convert_changed_rows():
+    events = list(
+        field_diff_row_events(
+            [
+                {
+                    "key": "1",
+                    "changes": [{"field": "status", "left": "old", "right": "new"}],
+                }
+            ],
+            key_columns=["id"],
+        )
+    )
+
+    assert events == [
+        {"type": "row_changed", "key": {"id": "1"}, "changed_columns": ["status"]},
+        {
+            "type": "field_change",
+            "key": {"id": "1"},
+            "column": "status",
+            "left": "old",
+            "right": "new",
+        },
+    ]
+
+
+def test_field_diff_file_events_read_rows_lazily():
+    output = FIXTURES / "event-field-diff-rows.jsonl"
+    try:
+        output.write_text(
+            json.dumps(
+                {
+                    "key": "1",
+                    "changes": [{"field": "price", "left": 10, "right": 12}],
+                },
+                separators=(",", ":"),
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        events = list(field_diff_file_events(output, key_columns=["id"]))
+    finally:
+        output.unlink(missing_ok=True)
+
+    assert events[0] == {"type": "row_changed", "key": {"id": "1"}, "changed_columns": ["price"]}
+    assert events[1]["type"] == "field_change"
+    assert events[1]["column"] == "price"
+
+
 def test_iter_compare_events_is_a_generator_contract():
     events = iter_compare_events([{"id": "1"}], [{"id": "2"}], key="id")
 
@@ -90,6 +143,46 @@ def test_iter_compare_events_is_a_generator_contract():
     assert rest[-1]["type"] == "summary"
     assert rest[-1]["only_left"] == 1
     assert rest[-1]["only_right"] == 1
+
+
+def test_iter_field_diff_events_yields_metadata_changes_and_summary():
+    events = list(
+        iter_field_diff_events(
+            [{"id": "1", "status": "old"}],
+            [{"id": "1", "status": "new"}],
+            key="id",
+            columns=("status",),
+        )
+    )
+
+    assert [event["type"] for event in events] == [
+        "metadata",
+        "row_changed",
+        "field_change",
+        "summary",
+    ]
+    assert events[0]["mode"] == "field_diff"
+    assert events[0]["compared_columns"] == ["status"]
+    assert events[-1]["changed_rows"] == 1
+    assert events[-1]["changed_fields"] == 1
+
+
+def test_iter_sorted_field_diff_events_streams_sorted_inputs():
+    events = iter_sorted_field_diff_events(
+        [{"id": "1", "status": "old"}, {"id": "2", "status": "same"}],
+        [{"id": "1", "status": "new"}, {"id": "2", "status": "same"}],
+        key="id",
+        columns=("status",),
+    )
+
+    first = next(events)
+    rest = list(events)
+
+    assert first["type"] == "metadata"
+    assert first["compared_columns"] == ["status"]
+    assert rest[0]["type"] == "row_changed"
+    assert rest[-1]["type"] == "summary"
+    assert rest[-1]["changed_rows"] == 1
 
 
 def test_iter_event_rows_reads_and_validates_event_stream():

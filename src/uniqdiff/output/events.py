@@ -250,22 +250,12 @@ def field_diff_result_events(
 
     changed_rows = 0
     changed_fields = 0
-    for row in rows:
-        key_value = event_key(row.get("key"), key_columns=key_columns)
-        changes = list(row.get("changes", ()))
-        changed_columns = [str(change["field"]) for change in changes if "field" in change]
-        if changed_columns:
+    for event in field_diff_row_events(rows, key_columns=key_columns):
+        if event["type"] == "row_changed":
             changed_rows += 1
-            yield _event("row_changed", key=key_value, changed_columns=changed_columns)
-        for change in changes:
+        elif event["type"] == "field_change":
             changed_fields += 1
-            yield _event(
-                "field_change",
-                key=key_value,
-                column=change["field"],
-                left=change.get("left"),
-                right=change.get("right"),
-            )
+        yield event
 
     yield build_summary_event(
         left_rows=int(stats.get("first_count", 0)),
@@ -274,6 +264,53 @@ def field_diff_result_events(
         changed_rows=int(stats.get("changed_row_count", changed_rows)),
         changed_fields=int(stats.get("changed_field_count", changed_fields)),
     )
+
+
+def field_diff_row_events(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    key_columns: Optional[Sequence[str]] = None,
+) -> Iterator[dict[str, Any]]:
+    """Yield row_changed and field_change events from field-diff rows.
+
+    Input rows use the stable field-diff JSONL row shape:
+    `{"key": ..., "changes": [{"field": ..., "left": ..., "right": ...}]}`.
+    This helper intentionally does not emit metadata or summary events, so callers
+    can compose it with compare/presence/schema events.
+    """
+
+    for row in rows:
+        key_value = event_key(row.get("key"), key_columns=key_columns)
+        changes = list(row.get("changes", ()))
+        changed_columns = [str(change["field"]) for change in changes if "field" in change]
+        if changed_columns:
+            yield _event("row_changed", key=key_value, changed_columns=changed_columns)
+        for change in changes:
+            yield _event(
+                "field_change",
+                key=key_value,
+                column=change["field"],
+                left=change.get("left"),
+                right=change.get("right"),
+            )
+
+
+def field_diff_file_events(
+    output: Union[str, os.PathLike[str]],
+    *,
+    key_columns: Optional[Sequence[str]] = None,
+) -> Iterator[dict[str, Any]]:
+    """Yield field-diff events lazily from a field-diff JSONL row file."""
+
+    output_path = Path(output)
+    with output_path.open("r", encoding="utf-8") as file:
+        for line in file:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            if not isinstance(row, Mapping):
+                raise InvalidInputError("field diff JSONL row must be an object")
+            yield from field_diff_row_events([row], key_columns=key_columns)
 
 
 def schema_diff_result_events(

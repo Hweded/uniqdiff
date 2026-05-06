@@ -44,6 +44,8 @@
 - Added result-oriented sorted field-diff APIs:
   `compare_fields_sorted()`, `compare_fields_files_sorted()`, and
   `compare_file_fields_sorted()`.
+- Added reusable field-diff event helpers and public event APIs:
+  `iter_field_diff_events()` and `iter_sorted_field_diff_events()`.
 
 ## 1.0.0
 

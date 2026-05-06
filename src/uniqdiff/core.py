@@ -16,7 +16,7 @@ from uniqdiff.fields import compare_fields_files as _compare_fields_files
 from uniqdiff.fields import compare_fields_files_sorted as _compare_fields_files_sorted
 from uniqdiff.fields import compare_fields_sorted as _compare_fields_sorted
 from uniqdiff.fields import iter_field_diff_sorted as _iter_field_diff_sorted
-from uniqdiff.output import compare_result_events
+from uniqdiff.output import compare_result_events, field_diff_result_events
 from uniqdiff.planner import build_duplicates_plan, build_execution_plan, disk_compare_backend
 from uniqdiff.result import CompareResult, CompareStats
 from uniqdiff.schema import SchemaDiffResult, SchemaResult
@@ -353,6 +353,80 @@ def iter_compare_events(
     )
 
 
+def iter_field_diff_events(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec,
+    columns: Optional[Sequence[str]] = None,
+    exclude_columns: Optional[Sequence[str]] = None,
+    normalizer: Optional[Normalizer] = None,
+    sorted_input: bool = False,
+    validate_sorted: bool = True,
+    compared_columns: Optional[Sequence[str]] = None,
+) -> Iterator[dict[str, Any]]:
+    """Yield a `uniqdiff.jsonl` event stream for field-level comparison."""
+
+    if sorted_input:
+        yield from iter_sorted_field_diff_events(
+            first,
+            second,
+            key=key,
+            columns=columns,
+            exclude_columns=exclude_columns,
+            normalizer=normalizer,
+            validate_sorted=validate_sorted,
+            compared_columns=compared_columns,
+        )
+        return
+
+    result = compare_fields(
+        first,
+        second,
+        key=key,
+        columns=columns,
+        exclude_columns=exclude_columns,
+        normalizer=normalizer,
+    )
+    yield from field_diff_result_events(
+        result.rows,
+        stats=result.stats.to_dict(),
+        summary_by_column=result.summary_by_column,
+        key_columns=_field_key_columns(key),
+        compared_columns=_compared_columns(columns, exclude_columns, compared_columns),
+    )
+
+
+def iter_sorted_field_diff_events(
+    first: Iterable[Any],
+    second: Iterable[Any],
+    *,
+    key: KeySpec,
+    columns: Optional[Sequence[str]] = None,
+    exclude_columns: Optional[Sequence[str]] = None,
+    normalizer: Optional[Normalizer] = None,
+    validate_sorted: bool = True,
+    compared_columns: Optional[Sequence[str]] = None,
+) -> Iterator[dict[str, Any]]:
+    """Yield field-level events for inputs already sorted by key."""
+
+    rows = iter_field_diff_sorted(
+        first,
+        second,
+        key=key,
+        columns=columns,
+        exclude_columns=exclude_columns,
+        normalizer=normalizer,
+        validate_sorted=validate_sorted,
+    )
+    yield from field_diff_result_events(
+        rows,
+        stats={},
+        key_columns=_field_key_columns(key),
+        compared_columns=_compared_columns(columns, exclude_columns, compared_columns),
+    )
+
+
 def compare_sorted_iter(
     first: Iterable[Any],
     second: Iterable[Any],
@@ -600,3 +674,23 @@ def duplicates_source(
 
     connector = connect(source, kind=kind, **(options or {}))
     return duplicates(connector.open(), **kwargs)
+
+
+def _field_key_columns(key: KeySpec) -> list[str]:
+    if isinstance(key, str):
+        return [key]
+    if isinstance(key, (tuple, list)) and all(isinstance(part, str) for part in key):
+        return list(key)
+    return []
+
+
+def _compared_columns(
+    columns: Optional[Sequence[str]],
+    exclude_columns: Optional[Sequence[str]],
+    explicit: Optional[Sequence[str]],
+) -> list[str]:
+    if explicit is not None:
+        return list(explicit)
+    values = list(columns or ())
+    excluded = set(exclude_columns or ())
+    return [value for value in values if value not in excluded]

@@ -31,8 +31,9 @@ from uniqdiff.output import (
     build_summary_event,
     compare_result_events,
     event_key,
+    field_diff_file_events,
+    field_diff_row_events,
     iter_result_rows,
-    validate_event,
 )
 from uniqdiff.result import CompareResult
 
@@ -686,8 +687,8 @@ def _write_field_diff_events(args: argparse.Namespace, writer: JsonlWriter) -> N
             max_bytes=args.max_bytes,
             exclude_columns=_parse_fieldnames(args.exclude_columns),
         )
-        for row in _iter_field_event_rows(field_output, key_columns=_key_columns(key)):
-            writer.write_event(row)
+        for event in field_diff_file_events(field_output, key_columns=_key_columns(key)):
+            writer.write_event(event)
     finally:
         field_output.unlink(missing_ok=True)
 
@@ -798,7 +799,7 @@ def _write_sorted_field_diff_events(
         changed_fields += len(changes)
         if args.max_rows is not None and emitted_rows >= args.max_rows:
             continue
-        for event in _iter_memory_field_event_rows([row], key_columns=_key_columns(key)):
+        for event in field_diff_row_events([row], key_columns=_key_columns(key)):
             writer.write_event(event)
         emitted_rows += 1
 
@@ -863,68 +864,6 @@ def _write_schema_diff_events(args: argparse.Namespace, writer: JsonlWriter) -> 
             schema_changes=schema_changes,
         )
     )
-
-
-def _iter_field_event_rows(
-    output: Path,
-    *,
-    key_columns: Sequence[str],
-) -> Iterator[dict[str, Any]]:
-    with output.open("r", encoding="utf-8") as file:
-        for line in file:
-            if not line.strip():
-                continue
-            row = json.loads(line)
-            key_value = event_key(row["key"], key_columns=key_columns)
-            changes = row.get("changes", ())
-            changed_columns = [change["field"] for change in changes]
-            if changed_columns:
-                event = {
-                    "type": "row_changed",
-                    "key": key_value,
-                    "changed_columns": changed_columns,
-                }
-                validate_event(event)
-                yield event
-            for change in changes:
-                event = {
-                    "type": "field_change",
-                    "key": key_value,
-                    "column": change["field"],
-                    "left": change.get("left"),
-                    "right": change.get("right"),
-                }
-                validate_event(event)
-                yield event
-
-
-def _iter_memory_field_event_rows(
-    rows: Sequence[dict[str, Any]],
-    *,
-    key_columns: Sequence[str],
-) -> Iterator[dict[str, Any]]:
-    for row in rows:
-        key_value = event_key(row["key"], key_columns=key_columns)
-        changes = row.get("changes", ())
-        changed_columns = [change["field"] for change in changes]
-        if changed_columns:
-            event = {
-                "type": "row_changed",
-                "key": key_value,
-                "changed_columns": changed_columns,
-            }
-            validate_event(event)
-            yield event
-        for change in changes:
-            event = {
-                "type": "field_change",
-                "key": key_value,
-                "column": change["field"],
-                "left": change.get("left"),
-                "right": change.get("right"),
-            }
-            validate_event(event)
-            yield event
 
 
 def _temporary_jsonl_path(args: argparse.Namespace) -> Path:

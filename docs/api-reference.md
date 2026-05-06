@@ -227,6 +227,33 @@ Important parameters:
 This API is designed for callers that want to write JSONL incrementally instead of
 building one large output object.
 
+## `iter_field_diff_events(first, second, key=...)`
+
+Yields a `uniqdiff.jsonl` event stream for field-level comparison.
+
+The stream contains:
+
+- `metadata`;
+- `row_changed` events;
+- `field_change` events;
+- `summary`.
+
+Important parameters:
+
+- `key`: required row key;
+- `columns`: optional fields to compare;
+- `exclude_columns`: optional fields to ignore;
+- `normalizer`: optional value normalizer before comparison;
+- `sorted_input`: use sorted streaming field diff when inputs are already sorted;
+- `validate_sorted`: validate sorted order when `sorted_input=True`;
+- `compared_columns`: explicit metadata for downstream tools.
+
+## `iter_sorted_field_diff_events(first, second, key=...)`
+
+Yields field-level `uniqdiff.jsonl` events for inputs already sorted by key. This
+is the event-stream counterpart to `iter_field_diff_sorted()` and avoids indexing
+the second input.
+
 ## `iter_event_rows(output, validate_sequence=True)`
 
 Lazily reads rows from a `uniqdiff.jsonl` event stream.
