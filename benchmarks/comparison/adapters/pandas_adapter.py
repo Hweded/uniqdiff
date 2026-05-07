@@ -19,6 +19,10 @@ class PandasAdapter(BenchmarkAdapter):
     def is_available(self) -> bool:
         return has_module("pandas")
 
+    def warmup(self) -> None:
+        if self.is_available():
+            import pandas  # noqa: F401
+
     def row_presence(self, dataset: DatasetPaths, output_dir: Path) -> ScenarioResult:
         if not self.is_available():
             return unavailable_result(
@@ -29,8 +33,8 @@ class PandasAdapter(BenchmarkAdapter):
             )
         import pandas as pd
 
-        left = pd.read_csv(dataset.left_csv, dtype={"id": str})
-        right = pd.read_csv(dataset.right_csv, dtype={"id": str})
+        left = pd.read_csv(dataset.left_csv, dtype=str, keep_default_na=False)
+        right = pd.read_csv(dataset.right_csv, dtype=str, keep_default_na=False)
         merged = left[["id"]].merge(right[["id"]], on="id", how="outer", indicator=True)
         return ScenarioResult(
             adapter=self.name,
@@ -53,7 +57,7 @@ class PandasAdapter(BenchmarkAdapter):
             )
         import pandas as pd
 
-        rows = pd.read_csv(dataset.duplicate_csv, dtype={"id": str})
+        rows = pd.read_csv(dataset.duplicate_csv, dtype=str, keep_default_na=False)
         duplicates = rows.duplicated(subset=["id"], keep="first")
         return ScenarioResult(
             adapter=self.name,
@@ -73,14 +77,10 @@ class PandasAdapter(BenchmarkAdapter):
             )
         import pandas as pd
 
-        left = pd.read_csv(dataset.left_csv, dtype={"id": str}).set_index("id")
-        right = pd.read_csv(dataset.right_csv, dtype={"id": str}).set_index("id")
+        left = pd.read_csv(dataset.left_csv, dtype=str, keep_default_na=False).set_index("id")
+        right = pd.read_csv(dataset.right_csv, dtype=str, keep_default_na=False).set_index("id")
         common = left.index.intersection(right.index)
-        columns = [
-            column
-            for column in left.columns
-            if column in right.columns and column != "source"
-        ]
+        columns = [column for column in dataset.metadata["compared_columns"] if column in right]
         changed = left.loc[common, columns].ne(right.loc[common, columns])
         return ScenarioResult(
             adapter=self.name,
@@ -102,8 +102,8 @@ class PandasAdapter(BenchmarkAdapter):
             )
         import pandas as pd
 
-        left = pd.read_csv(dataset.left_csv, dtype={"id": str})
-        right = pd.read_csv(dataset.right_csv, dtype={"id": str})
+        left = pd.read_csv(dataset.left_csv, dtype=str, keep_default_na=False)
+        right = pd.read_csv(dataset.right_csv, dtype=str, keep_default_na=False)
         merged = left.merge(right[["id"]], on="id", how="left", indicator=True)
         output = output_dir / "pandas-large-output.jsonl"
         merged.loc[merged["_merge"] == "left_only"].to_json(output, orient="records", lines=True)

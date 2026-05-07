@@ -16,8 +16,24 @@ python benchmarks/comparison/run.py --rows 10000
 
 The cross-tool suite is intentionally fit-by-use-case oriented. It reports
 support levels, setup complexity, elapsed time, peak Python memory, output size,
-and a workload-dependent disclaimer instead of claiming that one tool is
-universally faster.
+deterministic expected-count validation, workload metadata, and a
+workload-dependent disclaimer instead of claiming that one tool is universally
+faster.
+
+Concrete workload profiles:
+
+- `orders`: default order-like rows with mixed column types.
+- `wide_orders`: wider rows for field-diff and row-width pressure.
+- `large_output`: lower overlap and larger payloads for file/stream output paths.
+
+Examples:
+
+```bash
+python benchmarks/comparison/run.py --profile orders --rows 10000
+python benchmarks/comparison/run.py --profile wide_orders --rows 50000
+python benchmarks/comparison/run.py --profile large_output --rows 100000 \
+  --scenario large_output_handling
+```
 
 ## uniqdiff backend benchmarks
 

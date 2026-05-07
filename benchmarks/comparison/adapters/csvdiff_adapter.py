@@ -19,6 +19,10 @@ class CsvDiffAdapter(BenchmarkAdapter):
     def is_available(self) -> bool:
         return has_module("csv_diff")
 
+    def warmup(self) -> None:
+        if self.is_available():
+            import csv_diff  # noqa: F401
+
     def row_presence(self, dataset: DatasetPaths, output_dir: Path) -> ScenarioResult:
         if not self.is_available():
             return unavailable_result(

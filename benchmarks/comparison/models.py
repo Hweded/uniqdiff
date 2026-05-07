@@ -30,8 +30,11 @@ class ScenarioResult:
     scenario: str
     support_level: SupportLevel
     status: str
+    workload: dict[str, Any] = field(default_factory=dict)
+    input_rows: Optional[int] = None
     elapsed_seconds: Optional[float] = None
     peak_memory_bytes: Optional[int] = None
+    rows_per_second: Optional[float] = None
     output_bytes: int = 0
     only_in_left_count: Optional[int] = None
     only_in_right_count: Optional[int] = None
@@ -56,3 +59,5 @@ class DatasetPaths:
     left_csv: str
     right_csv: str
     duplicate_csv: str
+    metadata_json: str
+    metadata: dict[str, Any]

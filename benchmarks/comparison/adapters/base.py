@@ -18,6 +18,11 @@ class BenchmarkAdapter(ABC):
 
         return True
 
+    def warmup(self) -> None:
+        """Import optional dependencies before measured scenarios when useful."""
+
+        return None
+
     def missing_result(self, scenario: str, *, reason: str) -> ScenarioResult:
         """Return a not-supported result for missing optional dependencies."""
 

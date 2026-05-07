@@ -19,6 +19,10 @@ class DuckDBAdapter(BenchmarkAdapter):
     def is_available(self) -> bool:
         return has_module("duckdb")
 
+    def warmup(self) -> None:
+        if self.is_available():
+            import duckdb  # noqa: F401
+
     def row_presence(self, dataset: DatasetPaths, output_dir: Path) -> ScenarioResult:
         if not self.is_available():
             return unavailable_result(
@@ -94,18 +98,19 @@ class DuckDBAdapter(BenchmarkAdapter):
             )
         import duckdb
 
+        comparisons = " OR ".join(
+            _distinct_sql(column) for column in dataset.metadata["compared_columns"]
+        )
+        field_sum = " + ".join(
+            f"CASE WHEN {_distinct_sql(column)} THEN 1 ELSE 0 END"
+            for column in dataset.metadata["compared_columns"]
+        )
         with duckdb.connect(":memory:") as conn:
             row = conn.execute(
-                """
+                f"""
                 SELECT
-                  COUNT(*) FILTER (
-                    WHERE l.name != r.name OR l.amount != r.amount OR l.status != r.status
-                  ) AS changed_rows,
-                  SUM(
-                    CASE WHEN l.name != r.name THEN 1 ELSE 0 END +
-                    CASE WHEN l.amount != r.amount THEN 1 ELSE 0 END +
-                    CASE WHEN l.status != r.status THEN 1 ELSE 0 END
-                  ) AS changed_fields
+                  COUNT(*) FILTER (WHERE {comparisons}) AS changed_rows,
+                  SUM({field_sum}) AS changed_fields
                 FROM read_csv_auto(?) l
                 JOIN read_csv_auto(?) r USING (id)
                 """,
@@ -161,3 +166,8 @@ class DuckDBAdapter(BenchmarkAdapter):
             status="ok",
             extra={"install": "pip install duckdb", "typical_lines_of_code": "medium"},
         )
+
+
+def _distinct_sql(column: str) -> str:
+    quoted = '"' + column.replace('"', '""') + '"'
+    return f"COALESCE(CAST(l.{quoted} AS VARCHAR), '') != COALESCE(CAST(r.{quoted} AS VARCHAR), '')"

@@ -5,10 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from benchmarks.comparison.adapters.base import BenchmarkAdapter, result
-from benchmarks.comparison.adapters.utils import changed_rows, read_csv_rows
 from benchmarks.comparison.measure import file_size
 from benchmarks.comparison.models import DatasetPaths, ScenarioResult
-from uniqdiff import compare_files, duplicates_source
+from uniqdiff import compare_file_fields, compare_files, duplicates_source
 
 
 class UniqdiffAdapter(BenchmarkAdapter):
@@ -41,17 +40,23 @@ class UniqdiffAdapter(BenchmarkAdapter):
         return item
 
     def row_level_changed_fields(self, dataset: DatasetPaths, output_dir: Path) -> ScenarioResult:
-        left = read_csv_rows(dataset.left_csv)
-        right = read_csv_rows(dataset.right_csv)
-        changed_row_count, changed_field_count = changed_rows(left, right)
+        compared = compare_file_fields(
+            dataset.left_csv,
+            dataset.right_csv,
+            format="csv",
+            key="id",
+            columns=dataset.metadata["compared_columns"],
+            output=str(output_dir / "uniqdiff-field-diff.jsonl"),
+        )
         item = result(
             adapter=self.name,
             scenario="row_level_changed_fields_by_key",
-            support_level="custom_code",
-            notes=["uniqdiff core reports presence; field-level row diff belongs in uniqrowdiff."],
+            support_level="native",
+            notes=["Uses uniqdiff engine-level field comparison with JSONL output."],
         )
-        item.changed_rows_count = changed_row_count
-        item.changed_fields_count = changed_field_count
+        item.changed_rows_count = compared.stats.changed_row_count
+        item.changed_fields_count = compared.stats.changed_field_count
+        item.output_bytes = file_size(output_dir / "uniqdiff-field-diff.jsonl")
         return item
 
     def large_output_handling(self, dataset: DatasetPaths, output_dir: Path) -> ScenarioResult:

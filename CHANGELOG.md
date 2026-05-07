@@ -50,6 +50,9 @@
   profiling results.
 - Optimized field-diff key extraction and no-normalizer value comparisons in hot
   loops.
+- Made cross-tool benchmarks more realistic with concrete order-like workload
+  profiles, schema metadata, expected-count validation, adapter warmup, and
+  rows-per-second reporting.
 
 ## 1.0.0
 

@@ -23,6 +23,11 @@ class DataComPyAdapter(BenchmarkAdapter):
     def is_available(self) -> bool:
         return has_module("datacompy") and has_module("pandas")
 
+    def warmup(self) -> None:
+        if self.is_available():
+            import datacompy  # noqa: F401
+            import pandas  # noqa: F401
+
     def row_presence(self, dataset: DatasetPaths, output_dir: Path) -> ScenarioResult:
         if not self.is_available():
             return unavailable_result(
@@ -74,6 +79,7 @@ class DataComPyAdapter(BenchmarkAdapter):
         changed_row_count, changed_field_count = changed_rows(
             read_csv_rows(dataset.left_csv),
             read_csv_rows(dataset.right_csv),
+            columns=dataset.metadata["compared_columns"],
         )
         return ScenarioResult(
             adapter=self.name,
@@ -125,8 +131,8 @@ class DataComPyAdapter(BenchmarkAdapter):
         import pandas as pd
         from datacompy.core import Compare
 
-        left = pd.read_csv(dataset.left_csv, dtype={"id": str})
-        right = pd.read_csv(dataset.right_csv, dtype={"id": str})
+        left = pd.read_csv(dataset.left_csv, dtype=str, keep_default_na=False)
+        right = pd.read_csv(dataset.right_csv, dtype=str, keep_default_na=False)
         try:
             return Compare(
                 left,

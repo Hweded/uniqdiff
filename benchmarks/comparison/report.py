@@ -40,6 +40,10 @@ def write_markdown(results: list[ScenarioResult], output: Path) -> None:
         "",
         _fit_table(results),
         "",
+        "## Workload",
+        "",
+        _workload_table(results),
+        "",
         "## Measurements",
         "",
         _measurement_table(results),
@@ -84,10 +88,34 @@ def _fit_table(results: list[ScenarioResult]) -> str:
     return "\n".join(lines)
 
 
+def _workload_table(results: list[ScenarioResult]) -> str:
+    if not results or not results[0].workload:
+        return "No workload metadata was captured."
+    workload = results[0].workload
+    lines = ["| Setting | Value |", "| --- | --- |"]
+    for key in [
+        "profile",
+        "rows_per_side",
+        "seed",
+        "overlap_ratio",
+        "changed_ratio",
+        "duplicate_ratio",
+        "null_ratio",
+        "payload_bytes",
+        "wide_columns",
+        "schema_columns",
+    ]:
+        lines.append(f"| `{key}` | {workload.get(key)} |")
+    return "\n".join(lines)
+
+
 def _measurement_table(results: list[ScenarioResult]) -> str:
     lines = [
-        "| Adapter | Scenario | Support | Status | Seconds | Peak MB | Output bytes | Key counts |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | --- |",
+        (
+            "| Adapter | Scenario | Support | Status | Seconds | Peak MB | Rows/s | "
+            "Output bytes | Expected | Key counts |"
+        ),
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
     ]
     for result in results:
         peak_mb = (
@@ -102,7 +130,7 @@ def _measurement_table(results: list[ScenarioResult]) -> str:
         )
         template = (
             "| {adapter} | {scenario} | {support} | {status} | {seconds} | "
-            "{peak} | {output} | {counts} |"
+            "{peak} | {rows_per_second} | {output} | {expected} | {counts} |"
         )
         lines.append(
             template.format(
@@ -112,7 +140,11 @@ def _measurement_table(results: list[ScenarioResult]) -> str:
                 status=result.status,
                 seconds=result.elapsed_seconds if result.elapsed_seconds is not None else "-",
                 peak=peak_mb,
+                rows_per_second=(
+                    result.rows_per_second if result.rows_per_second is not None else "-"
+                ),
                 output=result.output_bytes,
+                expected=result.extra.get("matches_expected", "-"),
                 counts=key_counts,
             )
         )

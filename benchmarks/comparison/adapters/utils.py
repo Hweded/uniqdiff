@@ -52,19 +52,27 @@ def duplicate_count(rows: list[dict[str, str]]) -> int:
     return sum(count - 1 for count in counts.values() if count > 1)
 
 
-def changed_rows(left: list[dict[str, str]], right: list[dict[str, str]]) -> tuple[int, int]:
+def changed_rows(
+    left: list[dict[str, str]],
+    right: list[dict[str, str]],
+    *,
+    columns: list[str] | None = None,
+) -> tuple[int, int]:
     """Count changed rows and changed fields for common keys."""
 
     left_by_key = {row["id"]: row for row in left}
     right_by_key = {row["id"]: row for row in right}
     changed_row_count = 0
     changed_field_count = 0
-    ignored = {"id", "source"}
+    compared_columns = columns
     for key in sorted(left_by_key.keys() & right_by_key.keys()):
+        fields = compared_columns or [
+            field for field in left_by_key[key] if field not in {"id", "source"}
+        ]
         field_changes = sum(
             1
-            for field, left_value in left_by_key[key].items()
-            if field not in ignored and left_value != right_by_key[key].get(field)
+            for field in fields
+            if left_by_key[key].get(field) != right_by_key[key].get(field)
         )
         if field_changes:
             changed_row_count += 1

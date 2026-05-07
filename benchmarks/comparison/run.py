@@ -20,7 +20,7 @@ for import_root in (PROJECT_ROOT, SRC_ROOT):
         sys.path.insert(0, str(import_root))
 
 from benchmarks.comparison.adapters import BenchmarkAdapter, default_adapters  # noqa: E402
-from benchmarks.comparison.data import generate_dataset  # noqa: E402
+from benchmarks.comparison.data import PROFILES, generate_dataset, profile_defaults  # noqa: E402
 from benchmarks.comparison.measure import measure  # noqa: E402
 from benchmarks.comparison.models import DatasetPaths, ScenarioResult  # noqa: E402
 from benchmarks.comparison.report import write_jsonl, write_markdown  # noqa: E402
@@ -40,9 +40,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     parser.add_argument("--rows", type=int, default=10_000, help="Rows per left/right CSV.")
     parser.add_argument("--seed", type=int, default=42, help="Deterministic dataset seed.")
-    parser.add_argument("--overlap-ratio", type=float, default=0.7)
-    parser.add_argument("--changed-ratio", type=float, default=0.2)
-    parser.add_argument("--duplicate-ratio", type=float, default=0.1)
+    parser.add_argument(
+        "--profile",
+        choices=sorted(PROFILES),
+        default="orders",
+        help="Concrete workload profile. Explicit ratio/shape flags override profile defaults.",
+    )
+    parser.add_argument("--overlap-ratio", type=float)
+    parser.add_argument("--changed-ratio", type=float)
+    parser.add_argument("--duplicate-ratio", type=float)
+    parser.add_argument("--null-ratio", type=float)
+    parser.add_argument("--payload-bytes", type=int)
+    parser.add_argument("--wide-columns", type=int)
     parser.add_argument(
         "--adapter",
         action="append",
@@ -68,9 +77,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    _validate_ratios(parser, args.overlap_ratio, args.changed_ratio, args.duplicate_ratio)
+    defaults = profile_defaults(args.profile)
+    overlap_ratio = _arg_or_default(args.overlap_ratio, defaults["overlap_ratio"])
+    changed_ratio = _arg_or_default(args.changed_ratio, defaults["changed_ratio"])
+    duplicate_ratio = _arg_or_default(args.duplicate_ratio, defaults["duplicate_ratio"])
+    null_ratio = _arg_or_default(args.null_ratio, defaults["null_ratio"])
+    payload_bytes = _arg_or_default(args.payload_bytes, defaults["payload_bytes"])
+    wide_columns = _arg_or_default(args.wide_columns, defaults["wide_columns"])
+
+    _validate_ratios(parser, overlap_ratio, changed_ratio, duplicate_ratio, null_ratio)
     if args.rows < 0:
         parser.error("--rows must be greater than or equal to zero")
+    if payload_bytes < 0:
+        parser.error("--payload-bytes must be greater than or equal to zero")
+    if wide_columns < 0:
+        parser.error("--wide-columns must be greater than or equal to zero")
 
     output_dir = args.output_dir.resolve()
     data_dir = output_dir / "data"
@@ -80,10 +101,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     dataset = generate_dataset(
         data_dir,
         rows=args.rows,
-        overlap_ratio=args.overlap_ratio,
-        changed_ratio=args.changed_ratio,
-        duplicate_ratio=args.duplicate_ratio,
+        overlap_ratio=overlap_ratio,
+        changed_ratio=changed_ratio,
+        duplicate_ratio=duplicate_ratio,
         seed=args.seed,
+        profile=args.profile,
+        null_ratio=null_ratio,
+        payload_bytes=payload_bytes,
+        wide_columns=wide_columns,
     )
 
     adapters = _select_adapters(args.adapter)
@@ -101,6 +126,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(f"Wrote JSONL results: {results_path}")
     print(f"Wrote Markdown report: {report_path}")
     return 0
+
+
+def _arg_or_default(value: int | float | None, default: int | float) -> int | float:
+    return default if value is None else value
 
 
 def _validate_ratios(parser: argparse.ArgumentParser, *ratios: float) -> None:
@@ -125,6 +154,7 @@ def _run_suite(
 ) -> list[ScenarioResult]:
     results: list[ScenarioResult] = []
     for adapter in adapters:
+        adapter.warmup()
         adapter_dir = output_dir / adapter.name.replace("/", "-")
         adapter_dir.mkdir(parents=True, exist_ok=True)
         for scenario in scenarios:
@@ -142,9 +172,11 @@ def _run_measured(
     output_dir: Path,
 ) -> ScenarioResult:
     try:
-        return measure(lambda: method(dataset, output_dir))
+        measured = measure(lambda: method(dataset, output_dir))
+        _annotate_result(measured, dataset)
+        return measured
     except Exception as exc:  # pragma: no cover - defensive around optional adapters.
-        return ScenarioResult(
+        error_result = ScenarioResult(
             adapter=adapter.name,
             scenario=scenario,
             support_level="not_supported",
@@ -152,6 +184,88 @@ def _run_measured(
             error=f"{type(exc).__name__}: {exc}",
             notes=["Adapter raised an exception; inspect dependency version and adapter notes."],
         )
+        _annotate_result(error_result, dataset)
+        return error_result
+
+
+def _annotate_result(result: ScenarioResult, dataset: DatasetPaths) -> None:
+    metadata = dataset.metadata
+    expected = metadata["expected_counts"]
+    result.workload = {
+        "profile": metadata["profile"],
+        "rows_per_side": metadata["rows_per_side"],
+        "seed": metadata["seed"],
+        "overlap_ratio": metadata["overlap_ratio"],
+        "changed_ratio": metadata["changed_ratio"],
+        "duplicate_ratio": metadata["duplicate_ratio"],
+        "null_ratio": metadata["null_ratio"],
+        "payload_bytes": metadata["payload_bytes"],
+        "wide_columns": metadata["wide_columns"],
+        "schema_columns": len(metadata["schema_columns"]),
+    }
+    if result.status == "skipped":
+        result.input_rows = 0
+        result.rows_per_second = None
+        return
+    if result.input_rows is None:
+        if result.scenario == "duplicate_detection_by_key":
+            result.input_rows = expected["duplicate_rows"]
+        elif result.scenario == "implementation_setup_complexity":
+            result.input_rows = 0
+        else:
+            result.input_rows = expected["left_rows"] + expected["right_rows"]
+    if result.elapsed_seconds and result.input_rows:
+        result.rows_per_second = round(result.input_rows / result.elapsed_seconds, 2)
+    if result.status == "ok":
+        result.extra["expected_counts"] = _expected_for_scenario(result.scenario, expected)
+        result.extra["matches_expected"] = _matches_expected(result, expected)
+
+
+def _expected_for_scenario(scenario: str, expected: dict[str, int]) -> dict[str, int]:
+    if scenario in {"row_presence_by_key", "large_output_handling"}:
+        return {
+            "only_in_left": expected["only_in_left"],
+            "only_in_right": expected["only_in_right"],
+            "common": expected["common"],
+        }
+    if scenario == "duplicate_detection_by_key":
+        return {"duplicate_count": expected["duplicate_count"]}
+    if scenario == "row_level_changed_fields_by_key":
+        return {
+            "changed_rows": expected["changed_rows"],
+            "changed_fields": expected["changed_fields"],
+        }
+    return {}
+
+
+def _matches_expected(result: ScenarioResult, expected: dict[str, int]) -> bool | None:
+    if result.scenario == "row_presence_by_key":
+        return (
+            result.only_in_left_count == expected["only_in_left"]
+            and result.only_in_right_count == expected["only_in_right"]
+            and result.common_count == expected["common"]
+        )
+    if result.scenario == "duplicate_detection_by_key":
+        return result.duplicate_count == expected["duplicate_count"]
+    if result.scenario == "row_level_changed_fields_by_key":
+        return (
+            result.changed_rows_count == expected["changed_rows"]
+            and result.changed_fields_count == expected["changed_fields"]
+        )
+    if result.scenario == "large_output_handling":
+        counts = [
+            result.only_in_left_count,
+            result.only_in_right_count,
+            result.common_count,
+        ]
+        if any(count is None for count in counts):
+            return None
+        return (
+            result.only_in_left_count == expected["only_in_left"]
+            and result.only_in_right_count == expected["only_in_right"]
+            and result.common_count == expected["common"]
+        )
+    return None
 
 
 if __name__ == "__main__":
