@@ -53,6 +53,8 @@
 - Made cross-tool benchmarks more realistic with concrete order-like workload
   profiles, schema metadata, expected-count validation, adapter warmup, and
   rows-per-second reporting.
+- Added the explicit `uniqdiff.engine` facade as the preferred stable engine
+  import namespace for downstream UniqTools packages.
 
 ## 1.0.0
 

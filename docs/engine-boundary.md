@@ -47,13 +47,24 @@ templates stay outside the engine.
 
 Downstream packages should extend `uniqdiff` through:
 
-- root package exports;
+- the explicit `uniqdiff.engine` facade for stable engine primitives;
+- root package exports for backward-compatible existing integrations;
 - documented connector protocol;
 - documented result objects;
 - documented lazy result readers;
 - documented CLI contracts for automation.
 
 They should not import internal backend modules directly.
+
+Use `uniqdiff.engine` when building another library or product layer:
+
+```python
+from uniqdiff.engine import compare_files, iter_result_rows
+```
+
+The root `uniqdiff` package remains supported. The engine facade exists to make the
+architecture boundary clearer for downstream packages such as `uniqrowdiff`,
+`uniqschema`, `uniqcheck`, and `uniqtools-cli`.
 
 ## Internal Engine Layers
 

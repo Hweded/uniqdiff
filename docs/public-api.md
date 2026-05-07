@@ -12,6 +12,15 @@ from uniqdiff import compare, CompareResult, iter_result_values
 
 The following names are part of the 1.x engine contract:
 
+New downstream packages can import the same engine contract from
+`uniqdiff.engine`:
+
+```python
+from uniqdiff.engine import compare, compare_files, CompareResult
+```
+
+The root package remains the backward-compatible public facade for existing users.
+
 - `compare`;
 - `diff`;
 - `unique`;

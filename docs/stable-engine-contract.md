@@ -35,6 +35,17 @@ The 1.0 release should stabilize the following public API and behavior.
 These helpers define exact comparison semantics and should remain the primary API for
 simple iterable workflows.
 
+Downstream libraries may import the stable engine contract from either the root
+package or the explicit engine facade:
+
+```python
+from uniqdiff.engine import compare, compare_files, iter_compare_events
+```
+
+The root package remains backward-compatible. `uniqdiff.engine` is the preferred
+namespace for new UniqTools packages because it makes the engine boundary explicit
+and avoids depending on internal module layout.
+
 ### Structured Comparison
 
 - `compare_by_key`;
