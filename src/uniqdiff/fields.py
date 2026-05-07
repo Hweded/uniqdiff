@@ -365,16 +365,18 @@ def _changed_fields(
 ) -> list[FieldChange]:
     left = _as_mapping(left_row)
     right = _as_mapping(right_row)
-    field_names = _field_names(
-        left,
-        right,
-        columns=config.columns,
-        exclude_columns=config.exclude_columns,
-    )
+    field_names: Sequence[str]
+    if config.field_names is not None:
+        field_names = config.field_names
+    else:
+        field_names = _field_names(
+            left,
+            right,
+            columns=config.columns,
+            exclude_columns=config.dynamic_exclude_columns,
+        )
     changes: list[FieldChange] = []
     for field_name in field_names:
-        if config.columns is None and field_name in config.key_columns:
-            continue
         left_value = left.get(field_name)
         right_value = right.get(field_name)
         if _compare_value(left_value, config.normalizer) != _compare_value(
@@ -389,6 +391,8 @@ def _changed_fields(
 class _FieldDiffConfig:
     columns: Optional[set[str]]
     exclude_columns: set[str]
+    dynamic_exclude_columns: set[str]
+    field_names: Optional[tuple[str, ...]]
     key_columns: set[str]
     normalizer: Optional[Normalizer]
     max_rows: Optional[int]
@@ -437,10 +441,15 @@ def _build_config(
         raise InvalidInputError("compare_fields requires key")
     if max_rows is not None and max_rows < 0:
         raise InvalidInputError("max_rows must be greater than or equal to zero")
+    column_set = _column_set(columns)
+    exclude_set = _column_set(exclude_columns) or set()
+    key_columns = _key_columns(key)
     return _FieldDiffConfig(
-        columns=_column_set(columns),
-        exclude_columns=_column_set(exclude_columns) or set(),
-        key_columns=_key_columns(key),
+        columns=column_set,
+        exclude_columns=exclude_set,
+        dynamic_exclude_columns=exclude_set | (key_columns if column_set is None else set()),
+        field_names=_static_field_names(column_set, exclude_set),
+        key_columns=key_columns,
         normalizer=normalizer,
         max_rows=max_rows,
         max_bytes=parse_size(max_bytes) if max_bytes is not None else None,
@@ -593,6 +602,8 @@ def _sorted_result_warnings(
 
 
 def _as_mapping(row: Any) -> Mapping[str, Any]:
+    if type(row) is dict:
+        return row
     if isinstance(row, Mapping):
         return row
     if is_dataclass(row) and not isinstance(row, type):
@@ -612,6 +623,15 @@ def _field_names(
 ) -> list[str]:
     candidates = columns if columns is not None else set(left) | set(right)
     return sorted(field for field in candidates if field not in exclude_columns)
+
+
+def _static_field_names(
+    columns: Optional[set[str]],
+    exclude_columns: set[str],
+) -> Optional[tuple[str, ...]]:
+    if columns is None:
+        return None
+    return tuple(sorted(field for field in columns if field not in exclude_columns))
 
 
 def _compare_value(value: Any, normalizer: Optional[Normalizer]) -> Any:

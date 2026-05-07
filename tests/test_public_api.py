@@ -1,4 +1,10 @@
+import re
+from pathlib import Path
+
 import uniqdiff
+from uniqdiff._version import __version__
+
+PROJECT_ROOT = Path(__file__).parents[1]
 
 STABLE_ENGINE_EXPORTS = {
     "CompareResult",
@@ -33,3 +39,11 @@ def test_root_public_api_does_not_export_private_names():
 def test_public_exports_resolve_to_attributes():
     for name in uniqdiff.__all__:
         assert hasattr(uniqdiff, name)
+
+
+def test_package_version_constant_matches_pyproject():
+    pyproject = (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r'^version = "([^"]+)"$', pyproject, flags=re.MULTILINE)
+
+    assert match is not None
+    assert __version__ == match.group(1)

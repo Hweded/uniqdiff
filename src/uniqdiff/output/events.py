@@ -8,11 +8,11 @@ from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
 
 from uniqdiff._typing import KeySpec
+from uniqdiff._version import __version__
 from uniqdiff.exceptions import InvalidInputError
 from uniqdiff.result import CompareResult
 from uniqdiff.tokens import extract_key
@@ -102,10 +102,7 @@ def _utc_now() -> str:
 
 
 def _tool_version() -> str:
-    try:
-        return version("uniqdiff")
-    except PackageNotFoundError:
-        return "0.0.0"
+    return __version__
 
 
 @dataclass(frozen=True)
@@ -284,15 +281,19 @@ def field_diff_row_events(
         changes = list(row.get("changes", ()))
         changed_columns = [str(change["field"]) for change in changes if "field" in change]
         if changed_columns:
-            yield _event("row_changed", key=key_value, changed_columns=changed_columns)
+            yield {
+                "type": "row_changed",
+                "key": key_value,
+                "changed_columns": changed_columns,
+            }
         for change in changes:
-            yield _event(
-                "field_change",
-                key=key_value,
-                column=change["field"],
-                left=change.get("left"),
-                right=change.get("right"),
-            )
+            yield {
+                "type": "field_change",
+                "key": key_value,
+                "column": change["field"],
+                "left": change.get("left"),
+                "right": change.get("right"),
+            }
 
 
 def field_diff_file_events(

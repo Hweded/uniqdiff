@@ -46,6 +46,8 @@
   `compare_file_fields_sorted()`.
 - Added reusable field-diff event helpers and public event APIs:
   `iter_field_diff_events()` and `iter_sorted_field_diff_events()`.
+- Optimized field-diff column filtering and event metadata generation based on
+  profiling results.
 
 ## 1.0.0
 
