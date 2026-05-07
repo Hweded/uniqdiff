@@ -6,14 +6,14 @@ import json
 import os
 import tempfile
 from collections import Counter
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass
 from pathlib import Path
 from typing import Any, Optional, Union
 
 from uniqdiff._typing import KeySpec, Normalizer
 from uniqdiff._utils import parse_size
-from uniqdiff.exceptions import InvalidInputError
+from uniqdiff.exceptions import InvalidInputError, KeyExtractionError
 from uniqdiff.io.readers import read_file
 from uniqdiff.output import _json_dumps
 from uniqdiff.tokens import extract_key
@@ -117,13 +117,13 @@ def compare_fields(
         max_rows=max_rows,
         max_bytes=max_bytes,
     )
-    right_index = _index_rows_by_key(second, key=key)
+    right_index = _index_rows_by_key(second, key_extractor=config.key_extractor)
     accumulator = _FieldDiffAccumulator()
 
     with _JSONLFieldWriter.open_optional(output, max_bytes=config.max_bytes) as writer:
         for left_row in first:
             accumulator.first_count += 1
-            token = extract_key(left_row, key)
+            token = config.key_extractor(left_row)
             right_row = right_index.rows.get(token)
             if right_row is None:
                 continue
@@ -190,8 +190,16 @@ def iter_field_diff_sorted(
         max_rows=None,
         max_bytes=None,
     )
-    left_groups = _iter_key_groups(first, key=key, validate_sorted=validate_sorted)
-    right_groups = _iter_key_groups(second, key=key, validate_sorted=validate_sorted)
+    left_groups = _iter_key_groups(
+        first,
+        key_extractor=config.key_extractor,
+        validate_sorted=validate_sorted,
+    )
+    right_groups = _iter_key_groups(
+        second,
+        key_extractor=config.key_extractor,
+        validate_sorted=validate_sorted,
+    )
     left_item = next(left_groups, None)
     right_item = next(right_groups, None)
 
@@ -376,19 +384,26 @@ def _changed_fields(
             exclude_columns=config.dynamic_exclude_columns,
         )
     changes: list[FieldChange] = []
+    if config.normalizer is None:
+        for field_name in field_names:
+            left_value = left.get(field_name)
+            right_value = right.get(field_name)
+            if left_value != right_value:
+                changes.append(FieldChange(field=field_name, left=left_value, right=right_value))
+        return changes
+
+    normalizer = config.normalizer
     for field_name in field_names:
         left_value = left.get(field_name)
         right_value = right.get(field_name)
-        if _compare_value(left_value, config.normalizer) != _compare_value(
-            right_value,
-            config.normalizer,
-        ):
+        if normalizer(left_value) != normalizer(right_value):
             changes.append(FieldChange(field=field_name, left=left_value, right=right_value))
     return changes
 
 
 @dataclass(frozen=True)
 class _FieldDiffConfig:
+    key_extractor: Callable[[Any], Any]
     columns: Optional[set[str]]
     exclude_columns: set[str]
     dynamic_exclude_columns: set[str]
@@ -445,6 +460,7 @@ def _build_config(
     exclude_set = _column_set(exclude_columns) or set()
     key_columns = _key_columns(key)
     return _FieldDiffConfig(
+        key_extractor=_make_key_extractor(key),
         columns=column_set,
         exclude_columns=exclude_set,
         dynamic_exclude_columns=exclude_set | (key_columns if column_set is None else set()),
@@ -456,12 +472,16 @@ def _build_config(
     )
 
 
-def _index_rows_by_key(rows: Iterable[Any], *, key: KeySpec) -> _KeyIndex:
+def _index_rows_by_key(
+    rows: Iterable[Any],
+    *,
+    key_extractor: Callable[[Any], Any],
+) -> _KeyIndex:
     indexed: dict[Any, Any] = {}
     count = 0
     duplicate_key_count = 0
     for row in rows:
-        token = extract_key(row, key)
+        token = key_extractor(row)
         if token in indexed:
             duplicate_key_count += 1
         else:
@@ -634,12 +654,6 @@ def _static_field_names(
     return tuple(sorted(field for field in columns if field not in exclude_columns))
 
 
-def _compare_value(value: Any, normalizer: Optional[Normalizer]) -> Any:
-    if normalizer is None:
-        return value
-    return normalizer(value)
-
-
 def _column_set(columns: Optional[Sequence[str]]) -> Optional[set[str]]:
     if columns is None:
         return None
@@ -669,10 +683,42 @@ def _metadata_key(key: KeySpec) -> Any:
     return key
 
 
+def _make_key_extractor(key: KeySpec) -> Callable[[Any], Any]:
+    if isinstance(key, str):
+
+        def extract_str(row: Any) -> Any:
+            if type(row) is dict:
+                try:
+                    return row[key]
+                except KeyError as exc:
+                    raise KeyExtractionError(f"Missing key {key!r} in item {row!r}") from exc
+            return extract_key(row, key)
+
+        return extract_str
+
+    if isinstance(key, (tuple, list)) and all(isinstance(part, str) for part in key):
+        parts = tuple(key)
+
+        def extract_parts(row: Any) -> tuple[Any, ...]:
+            if type(row) is dict:
+                try:
+                    return tuple(row[part] for part in parts)
+                except KeyError as exc:
+                    missing = exc.args[0]
+                    raise KeyExtractionError(
+                        f"Missing key {missing!r} in item {row!r}"
+                    ) from exc
+            return tuple(extract_key(row, part) for part in parts)
+
+        return extract_parts
+
+    return lambda row: extract_key(row, key)
+
+
 def _iter_key_groups(
     rows: Iterable[Any],
     *,
-    key: KeySpec,
+    key_extractor: Callable[[Any], Any],
     validate_sorted: bool,
 ) -> Iterator[tuple[Any, list[Any]]]:
     previous_token: Any = None
@@ -681,7 +727,7 @@ def _iter_key_groups(
     has_previous = False
 
     for row in rows:
-        token = extract_key(row, key)
+        token = key_extractor(row)
         if validate_sorted and has_previous and token < previous_token:
             raise InvalidInputError("sorted field diff input is not sorted by key")
         previous_token = token

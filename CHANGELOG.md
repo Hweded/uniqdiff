@@ -48,6 +48,8 @@
   `iter_field_diff_events()` and `iter_sorted_field_diff_events()`.
 - Optimized field-diff column filtering and event metadata generation based on
   profiling results.
+- Optimized field-diff key extraction and no-normalizer value comparisons in hot
+  loops.
 
 ## 1.0.0
 

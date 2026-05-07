@@ -37,6 +37,19 @@ def test_compare_fields_reports_changed_fields_and_summary():
     assert result.stats.changed_field_count == 2
 
 
+def test_compare_fields_supports_composite_dict_keys():
+    result = compare_fields(
+        [{"tenant": "a", "id": 1, "status": "old"}],
+        [{"tenant": "a", "id": 1, "status": "new"}],
+        key=("tenant", "id"),
+        columns=("status",),
+    )
+
+    assert result.rows == [
+        {"key": ("a", 1), "changes": [{"field": "status", "left": "old", "right": "new"}]}
+    ]
+
+
 def test_compare_fields_respects_column_filter_and_exclusions():
     left = [{"id": 1, "name": "Ann", "city": "Paris", "updated_at": "old"}]
     right = [{"id": 1, "name": "Anne", "city": "Rome", "updated_at": "new"}]
