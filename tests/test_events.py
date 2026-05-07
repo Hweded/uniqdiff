@@ -47,6 +47,50 @@ def test_jsonl_writer_writes_one_valid_json_object_per_line():
     assert rows[0]["tool_version"] == "1.0.0"
 
 
+def test_jsonl_writer_buffers_and_flushes_on_close():
+    buffer = io.StringIO()
+    writer = JsonlWriter(buffer, buffer_size=10)
+
+    writer.write_event(build_metadata_event(key_columns=["id"]))
+    assert buffer.getvalue() == ""
+
+    writer.close()
+    rows = [json.loads(line) for line in buffer.getvalue().splitlines()]
+    assert rows[0]["type"] == "metadata"
+
+
+def test_jsonl_writer_limits_data_events_but_preserves_envelope():
+    buffer = io.StringIO()
+    writer = JsonlWriter(buffer, max_output_rows=1)
+
+    writer.write_event(build_metadata_event(key_columns=["id"]))
+    assert writer.write_event({"type": "only_left", "key": {"id": "1"}}) is True
+    assert writer.write_event({"type": "only_right", "key": {"id": "2"}}) is False
+    writer.write_event(build_summary_event(left_rows=2, only_left=1, only_right=1))
+    writer.close()
+
+    rows = [json.loads(line) for line in buffer.getvalue().splitlines()]
+    assert [row["type"] for row in rows] == ["metadata", "only_left", "summary"]
+    assert rows[-1]["output_truncated"] is True
+    assert rows[-1]["emitted_events"] == 1
+    assert rows[-1]["skipped_events"] == 1
+
+
+def test_jsonl_writer_byte_limit_counts_data_events_only():
+    buffer = io.StringIO()
+    writer = JsonlWriter(buffer, max_output_bytes=1)
+
+    writer.write_event(build_metadata_event(key_columns=["id"]))
+    assert writer.write_event({"type": "only_left", "key": {"id": "1"}}) is False
+    writer.write_event(build_summary_event(left_rows=1, only_left=1))
+    writer.close()
+
+    rows = [json.loads(line) for line in buffer.getvalue().splitlines()]
+    assert [row["type"] for row in rows] == ["metadata", "summary"]
+    assert rows[-1]["output_truncated"] is True
+    assert rows[-1]["skipped_events"] == 1
+
+
 @pytest.mark.parametrize(
     "event",
     [

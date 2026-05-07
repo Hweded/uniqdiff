@@ -349,6 +349,30 @@ def test_cli_compare_writes_uniqdiff_jsonl_events_to_stdout(capsys):
     assert rows[-1]["type"] == "summary"
     assert {"type": "only_left", "key": {"id": "1"}} in rows
     assert {"type": "only_right", "key": {"id": "3"}} in rows
+    assert not any(row.get("type") == "common" for row in rows)
+
+
+def test_cli_jsonl_events_respect_max_output_rows(capsys):
+    exit_code = main(
+        [
+            "compare",
+            str(FIXTURES / "left.csv"),
+            str(FIXTURES / "right.csv"),
+            "--key",
+            "id",
+            "--format",
+            "jsonl",
+            "--max-output-rows",
+            "1",
+        ]
+    )
+
+    rows = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+
+    assert exit_code == 0
+    assert [row["type"] for row in rows] == ["metadata", "only_left", "summary"]
+    assert rows[-1]["output_truncated"] is True
+    assert rows[-1]["emitted_events"] == 1
 
 
 def test_cli_compare_writes_uniqdiff_jsonl_events_to_file():

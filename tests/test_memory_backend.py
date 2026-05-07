@@ -52,3 +52,9 @@ def test_duplicates_memory_backend():
         "a",
         "a",
     ]
+
+
+def test_composite_dict_key_token_factory_uses_stable_scalar_tuple():
+    token_factory = make_token_factory(key=("tenant", "id"), normalizer=None)
+
+    assert token_factory({"tenant": "acme", "id": 42}) == ("acme", 42)

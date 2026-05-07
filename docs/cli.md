@@ -63,6 +63,8 @@ Output and behavior flags:
   `compare` and `diff`;
 - `--result-mode memory|file` for `compare`, `diff`, and `intersection`;
 - `--output path.json|path.jsonl|path.csv` for `compare`, `diff`, and `intersection`;
+- `--max-output-rows 100000` for limiting emitted JSONL data events;
+- `--max-output-bytes 100MB` for limiting emitted JSONL data-event bytes;
 - `--include-duplicates` for comparison commands;
 - `--field-diff` for field-level changes between rows with the same `--key`;
 - `--exclude-columns name,updated_at` for `--field-diff`;
@@ -134,6 +136,25 @@ uniqdiff compare old.csv new.csv \
 
 Each line is one JSON object. The first event is `metadata`, the last event is
 `summary`, and every event has a required `type` field.
+
+Common rows are not written as JSONL data events by default. The summary still
+includes `common_rows`, so CI/CD and ETL jobs get the count without paying the
+output cost for unchanged rows.
+
+Bound large event streams with output limits:
+
+```bash
+uniqdiff compare old.csv new.csv \
+  --input-format csv \
+  --key id \
+  --format jsonl \
+  --max-output-rows 100000 \
+  --max-output-bytes 100MB \
+  --output diff.jsonl
+```
+
+When a JSONL stream is capped, the `summary` event includes `output_truncated`,
+`emitted_events`, `skipped_events`, and `output_bytes`.
 
 If input extensions are ambiguous, set the input format separately:
 

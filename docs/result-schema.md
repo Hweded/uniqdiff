@@ -120,6 +120,24 @@ Example:
 Event JSONL is intended for streaming pipelines, CI/CD, and loading into analytical
 engines. It should be preferred over one large JSON object for large outputs.
 
+Event lines are compact JSON by default: UTF-8, one object per line, no pretty
+printing, and no trailing commas. The CLI writes event streams through a buffered
+writer while preserving the required `metadata` / `summary` envelope.
+
+`uniqdiff compare --format jsonl` does not emit common-row events by default. The
+`summary.common_rows` counter still reports the number of matching keys. This keeps
+large event streams focused on differences instead of writing millions of unchanged
+rows.
+
+For bounded output, use `--max-output-rows` and `--max-output-bytes`. These limits
+apply to data events; metadata and summary are still written. When a stream is
+truncated, the summary includes:
+
+- `output_truncated`;
+- `emitted_events`;
+- `skipped_events`;
+- `output_bytes`.
+
 The JSON Schema for one event line is stored in:
 
 ```text

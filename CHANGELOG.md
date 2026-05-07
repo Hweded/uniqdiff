@@ -55,6 +55,12 @@
   rows-per-second reporting.
 - Added the explicit `uniqdiff.engine` facade as the preferred stable engine
   import namespace for downstream UniqTools packages.
+- Added buffered compact JSONL event writing with `--max-output-rows` /
+  `--max-output-bytes`, preserving metadata and summary when output is capped.
+- Avoided materializing common rows for CLI `--format jsonl` compare streams by
+  default while preserving `summary.common_rows`.
+- Optimized composite dict key token extraction and in-memory duplicate collection
+  hot paths.
 
 ## 1.0.0
 

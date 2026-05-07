@@ -46,6 +46,21 @@ def make_token_factory(
 
     if isinstance(key, (tuple, list)):
         parts = tuple(key)
+        if normalizer is None and all(isinstance(part, str) for part in parts):
+
+            def token_from_str_key_parts(item: Any) -> Any:
+                if type(item) is dict:
+                    try:
+                        value = tuple(item[part] for part in parts)
+                    except KeyError as exc:
+                        raise KeyExtractionError(
+                            f"Missing key {exc.args[0]!r} in item {item!r}"
+                        ) from exc
+                else:
+                    value = tuple(extract_key(item, part) for part in parts)
+                return value if _scalar_tuple(value) else canonicalize(value)
+
+            return token_from_str_key_parts
 
         def token_from_key_parts(item: Any) -> Any:
             value = tuple(extract_key(item, part) for part in parts)
@@ -92,6 +107,10 @@ def canonicalize_token(value: Any) -> Any:
     if type(value) in _SCALAR_TOKEN_TYPES:
         return value
     return canonicalize(value)
+
+
+def _scalar_tuple(value: tuple[Any, ...]) -> bool:
+    return all(type(part) in _SCALAR_TOKEN_TYPES for part in value)
 
 
 def extract_key(item: Any, key: KeySpec) -> Any:

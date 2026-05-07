@@ -208,6 +208,18 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
         "--output",
         help="Output file. Supports .json, .jsonl, .csv for comparisons.",
     )
+    parser.add_argument(
+        "--max-output-rows",
+        type=int,
+        help="Maximum JSONL data events to emit with --format jsonl.",
+    )
+    parser.add_argument(
+        "--max-output-bytes",
+        help=(
+            "Maximum JSONL data-event bytes to emit with --format jsonl. "
+            "Metadata and summary are still written."
+        ),
+    )
 
 
 def _add_field_diff_args(parser: argparse.ArgumentParser) -> None:
@@ -431,6 +443,16 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise ValueError("--field-diff is supported only for compare and diff")
     if field_diff and not getattr(args, "key", None):
         raise ValueError("--field-diff requires --key")
+    if getattr(args, "max_output_rows", None) is not None and args.max_output_rows < 0:
+        raise ValueError("--max-output-rows must be greater than or equal to zero")
+    if (
+        not event_stream
+        and (
+            getattr(args, "max_output_rows", None) is not None
+            or getattr(args, "max_output_bytes", None) is not None
+        )
+    ):
+        raise ValueError("--max-output-* is supported only with --format jsonl")
 
     if (field_diff or schema_diff) and result_mode != "memory":
         raise ValueError("--result-mode is not used with --field-diff or --schema-diff")
@@ -465,7 +487,11 @@ def _write_event_output(
 ) -> None:
     output = getattr(args, "output", None)
     if output is None:
-        producer(JsonlWriter(sys.stdout))
+        writer = _jsonl_writer(sys.stdout, args)
+        try:
+            producer(writer)
+        finally:
+            writer.close()
         return
 
     output_path = Path(output)
@@ -475,11 +501,24 @@ def _write_event_output(
     temp_path = Path(temp_name)
     try:
         with temp_path.open("w", encoding="utf-8", newline="") as file:
-            producer(JsonlWriter(file))
+            writer = _jsonl_writer(file, args)
+            try:
+                producer(writer)
+            finally:
+                writer.close()
         os.replace(temp_path, output_path)
     except Exception:
         temp_path.unlink(missing_ok=True)
         raise
+
+
+def _jsonl_writer(file: Any, args: argparse.Namespace) -> JsonlWriter:
+    return JsonlWriter(
+        file,
+        buffer_size=64,
+        max_output_rows=getattr(args, "max_output_rows", None),
+        max_output_bytes=getattr(args, "max_output_bytes", None),
+    )
 
 
 def _write_compare_events(args: argparse.Namespace, writer: JsonlWriter) -> None:
@@ -511,7 +550,7 @@ def _write_compare_events(args: argparse.Namespace, writer: JsonlWriter) -> None
                 key=key,
                 normalizer=normalizer,
                 mode=args.mode,
-                include_common=args.command == "compare",
+                include_common=False,
                 include_duplicates=args.include_duplicates,
                 chunk_size=args.chunk_size,
                 memory_limit=getattr(args, "memory_limit", None),
@@ -542,7 +581,7 @@ def _write_compare_events(args: argparse.Namespace, writer: JsonlWriter) -> None
         key=key,
         normalizer=normalizer,
         mode=args.mode,
-        include_common=args.command == "compare",
+        include_common=False,
         include_duplicates=args.include_duplicates,
         chunk_size=args.chunk_size,
         memory_limit=getattr(args, "memory_limit", None),

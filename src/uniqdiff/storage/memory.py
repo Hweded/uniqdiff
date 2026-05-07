@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -114,24 +113,16 @@ def _index_items(
     collect_duplicates: bool,
 ) -> _MemoryIndex:
     first_by_token: dict[Any, Any] = {}
-    duplicate_values: Optional[dict[Any, list[Any]]] = (
-        defaultdict(list) if collect_duplicates else None
-    )
+    duplicates: Optional[list[Any]] = [] if collect_duplicates else None
     item_count = 0
     for item in items:
         token = token_factory(item)
         if token in first_by_token:
-            if duplicate_values is not None:
-                duplicate_values[token].append(item)
+            if duplicates is not None:
+                duplicates.append(item)
         else:
             first_by_token[token] = item
         item_count += 1
-
-    duplicates: Optional[list[Any]] = None
-    if duplicate_values is not None:
-        duplicates = []
-        for token in first_by_token:
-            duplicates.extend(duplicate_values.get(token, ()))
 
     return _MemoryIndex(
         first_by_token=first_by_token,
