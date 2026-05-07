@@ -161,9 +161,9 @@ The `uniqdiff.jsonl` event stream is the preferred machine-readable interchange
 format for CI/CD, ETL, and analytical loading workflows. The older file-result
 schema remains supported for compatibility with existing `section`/`value` readers.
 
-### 1.1-Pre Engine Additions
+### 1.x Engine Additions
 
-The current 1.x development branch also exposes documented engine primitives for:
+The 1.x branch also exposes documented engine primitives for:
 
 - sorted streaming diff through `iter_sorted_diff()`, `compare_sorted_iter()`,
   `write_sorted_diff()`, and `write_sorted_diff_file()`;
@@ -252,8 +252,8 @@ The current codebase already includes:
 - linting;
 - build checks.
 
-Therefore, `uniqdiff` should be treated as a stable 1.x comparison engine, not an
-early exploratory project.
+Therefore, `uniqdiff` should be treated as a stable 1.x comparison engine, not a
+pre-1.0 exploratory project.
 
 ## 1.0 Release Principle
 

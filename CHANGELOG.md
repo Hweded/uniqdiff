@@ -61,6 +61,8 @@
   default while preserving `summary.common_rows`.
 - Optimized composite dict key token extraction and in-memory duplicate collection
   hot paths.
+- Cleaned README benchmark content by moving detailed benchmark data to docs and
+  removed stale 1.1-pre wording from documentation.
 
 ## 1.0.0
 

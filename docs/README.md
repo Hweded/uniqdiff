@@ -63,5 +63,5 @@ This directory contains project documentation for users and maintainers.
 
 The project now includes documentation for practical usage recipes, backend behavior,
 migration guidance, and backward compatibility policy. The 1.0 engine contract is
-documented, and current documentation also covers the 1.1-pre field/schema diff
+documented, and current documentation also covers the 1.x field/schema diff
 surface.
