@@ -15,6 +15,7 @@ from uniqdiff import (
     summarize_event_file,
     summarize_events,
 )
+from uniqdiff._version import __version__
 from uniqdiff.output import (
     EVENT_FORMAT,
     EVENT_FORMAT_VERSION,
@@ -44,7 +45,7 @@ def test_jsonl_writer_writes_one_valid_json_object_per_line():
     assert [row["type"] for row in rows] == ["metadata", "only_left", "summary"]
     assert rows[0]["format"] == EVENT_FORMAT
     assert rows[0]["format_version"] == EVENT_FORMAT_VERSION
-    assert rows[0]["tool_version"] == "1.0.0"
+    assert rows[0]["tool_version"] == __version__
 
 
 def test_jsonl_writer_buffers_and_flushes_on_close():

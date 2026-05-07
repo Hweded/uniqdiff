@@ -1,13 +1,13 @@
 # Release Process
 
-This page documents the manual release flow for `uniqdiff` 1.0.x.
+This page documents the manual release flow for `uniqdiff` 1.x.
 
 ## Preconditions
 
 - `pyproject.toml` has the target version.
 - `pyproject.toml` uses the Apache-2.0 license metadata.
 - `CHANGELOG.md` has a section for the target version.
-- `docs/release-notes-1.0.md` is current for the release.
+- release notes for the target version are current.
 - Public/internal API boundary docs are current.
 - Result schema docs are current.
 - Backend behavior docs are current.
@@ -36,10 +36,10 @@ Expected release quality:
 
 ## Artifact Names
 
-For `1.0.0`, the expected artifacts are:
+For `1.1.0`, the expected artifacts are:
 
-- `dist/uniqdiff-1.0.0.tar.gz`;
-- `dist/uniqdiff-1.0.0-py3-none-any.whl`.
+- `dist/uniqdiff-1.1.0.tar.gz`;
+- `dist/uniqdiff-1.1.0-py3-none-any.whl`.
 
 ## Publishing
 
@@ -67,8 +67,8 @@ python -m twine upload dist/*
 Create an annotated release tag:
 
 ```bash
-git tag -a v1.0.0 -m "Release uniqdiff 1.0.0"
-git push origin v1.0.0
+git tag -a v1.1.0 -m "Release uniqdiff 1.1.0"
+git push origin v1.1.0
 ```
 
 ## Post-Release Checks
@@ -77,4 +77,4 @@ git push origin v1.0.0
 - Confirm `pip install uniqdiff` works in a clean environment.
 - Confirm `python -m uniqdiff --help` works.
 - Confirm README links resolve.
-- Create the GitHub release from the `v1.0.0` tag using the release notes.
+- Create the GitHub release from the target version tag using the release notes.

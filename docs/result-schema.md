@@ -111,7 +111,7 @@ Event types:
 Example:
 
 ```jsonl
-{"type":"metadata","format":"uniqdiff.jsonl","format_version":"1.0","tool":"uniqdiff","tool_version":"1.0.0","mode":"diff","key_columns":["id"],"compared_columns":["price","status"],"created_at":"2026-05-06T12:00:00Z"}
+{"type":"metadata","format":"uniqdiff.jsonl","format_version":"1.0","tool":"uniqdiff","tool_version":"1.1.0","mode":"diff","key_columns":["id"],"compared_columns":["price","status"],"created_at":"2026-05-06T12:00:00Z"}
 {"type":"only_left","key":{"id":"1001"}}
 {"type":"field_change","key":{"id":"123"},"column":"price","left":10,"right":12}
 {"type":"summary","left_rows":10000,"right_rows":10000,"common_rows":7000,"only_left":3000,"only_right":3000,"changed_rows":1400,"changed_fields":4200,"duplicate_keys_left":500,"duplicate_keys_right":500,"schema_changes":2}

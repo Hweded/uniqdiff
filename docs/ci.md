@@ -8,7 +8,7 @@ The GitHub Actions workflow is defined in:
 
 It runs:
 
-- tests on Python 3.9 through 3.13;
+- tests on Python 3.9 through 3.14;
 - `compileall`;
 - `ruff`;
 - `mypy`;

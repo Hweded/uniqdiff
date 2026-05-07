@@ -132,7 +132,7 @@ uniqdiff diff old.csv new.csv \
 Example `uniqdiff.jsonl` events:
 
 ```jsonl
-{"type":"metadata","format":"uniqdiff.jsonl","format_version":"1.0","tool":"uniqdiff","tool_version":"1.0.0","mode":"field_diff","key_columns":["id"],"compared_columns":["status"],"created_at":"2026-05-06T12:00:00Z"}
+{"type":"metadata","format":"uniqdiff.jsonl","format_version":"1.0","tool":"uniqdiff","tool_version":"1.1.0","mode":"field_diff","key_columns":["id"],"compared_columns":["status"],"created_at":"2026-05-06T12:00:00Z"}
 {"type":"only_left","key":{"id":"1"}}
 {"type":"field_change","key":{"id":"2"},"column":"status","left":"pending","right":"active"}
 {"type":"summary","left_rows":3,"right_rows":3,"common_rows":2,"only_left":1,"only_right":1,"changed_rows":1,"changed_fields":1,"duplicate_keys_left":0,"duplicate_keys_right":0,"schema_changes":0}

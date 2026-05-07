@@ -32,6 +32,8 @@ This directory contains project documentation for users and maintainers.
 - [Backward Compatibility](backward-compatibility.md)
 - [Release 1.0 Checklist](release-1.0.md)
 - [Release Notes 1.0](release-notes-1.0.md)
+- [Release 1.1 Checklist](release-1.1.md)
+- [Release Notes 1.1](release-notes-1.1.md)
 - [Release Process](release-process.md)
 - [Limitations and Security](limitations-security.md)
 
@@ -62,6 +64,6 @@ This directory contains project documentation for users and maintainers.
 ## Release Readiness
 
 The project now includes documentation for practical usage recipes, backend behavior,
-migration guidance, and backward compatibility policy. The 1.0 engine contract is
-documented, and current documentation also covers the 1.x field/schema diff
-surface.
+migration guidance, and backward compatibility policy. The 1.x engine contract is
+documented, including field diff, schema diff, JSONL events, sorted streaming, and
+the explicit `uniqdiff.engine` facade.

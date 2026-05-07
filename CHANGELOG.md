@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- No unreleased changes yet.
+
+## 1.1.0 - 2026-05-07
+
 - Improved `mode="auto"` decision metadata with requested/selected disk strategy,
   chunk size, ordering, common, and duplicate flags.
 - Added `disk_strategy="auto"` so the planner can choose between SQLite, hash
@@ -62,7 +66,7 @@
 - Optimized composite dict key token extraction and in-memory duplicate collection
   hot paths.
 - Cleaned README benchmark content by moving detailed benchmark data to docs and
-  removed stale 1.1-pre wording from documentation.
+  removed stale pre-release wording from documentation.
 
 ## 1.0.0
 

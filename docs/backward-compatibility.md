@@ -4,7 +4,7 @@ This policy defines how `uniqdiff` should evolve after 1.0.
 
 ## Stable Public API
 
-The following APIs are considered stable for 1.0:
+The following APIs are considered stable for 1.x:
 
 - `compare`;
 - `diff`;
@@ -24,6 +24,18 @@ The following APIs are considered stable for 1.0:
 - built-in file connectors;
 - `iter_result_rows`;
 - `iter_result_values`;
+- `iter_compare_events`;
+- `iter_event_rows`;
+- `summarize_events`;
+- `summarize_event_file`;
+- `compare_fields`;
+- `compare_file_fields`;
+- `compare_fields_sorted`;
+- `compare_file_fields_sorted`;
+- `infer_schema`;
+- `compare_schema`;
+- `compare_file_schema`;
+- `uniqdiff.engine` facade exports;
 - documented CLI commands and flags.
 
 Stable means:
@@ -89,8 +101,9 @@ Users should:
 
 ## Optional Dependency Compatibility
 
-Official 1.0 optional extras are `dev`, `fuzzy`, and `parquet`. Future optional
-connectors may evolve independently when they are added and documented.
+Official 1.1 optional extras are `dev`, `benchmark`, `fuzzy`, and `parquet`.
+Future optional connectors may evolve independently when they are added and
+documented.
 
 If an optional dependency is missing, `uniqdiff` should raise a clear
 `MissingOptionalDependencyError` or another documented `UniqDiffError` subclass.

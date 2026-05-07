@@ -59,16 +59,18 @@ and not suitable for very large all-pairs matching without additional indexing.
 
 ## Supported Python Versions
 
-The 1.0 support window is Python 3.9 through 3.13.
+The 1.1 support window is Python 3.9 through 3.14.
 
 ## Official Optional Extras
 
-Official 1.0 extras:
+Official 1.1 extras:
 
 - `dev`;
+- `benchmark`;
 - `fuzzy`;
 - `parquet`.
 
-`fuzzy` installs `rapidfuzz` for approximate string helpers. `parquet` installs
-`pyarrow` for Parquet file readers and connectors. Heavy database, cloud, and
-product-layer integrations are intentionally outside the core package.
+`benchmark` installs optional cross-tool benchmark dependencies. `fuzzy` installs
+`rapidfuzz` for approximate string helpers. `parquet` installs `pyarrow` for
+Parquet file readers and connectors. Heavy database, cloud, and product-layer
+integrations are intentionally outside the core package.
